@@ -331,6 +331,24 @@ function makeCells(frame,sz,r){
 }
 
 /* ================= ENGINE ================= */
+const shrinkP=(pts,f)=>{const c=cen(pts);return pts.map(p=>add(c,mul(sub(p,c),f)));};
+function doorSpec(cells,c,o,dc,k){
+  const n=edgeOut(dc.poly,k),y0=c.level*S;
+  if(o.n===10) return[{p:add(dc.hexC,mul(n,2.4*SQ3/2+.04)),n,y:y0+.2,w:.9,h:2.0}];
+  if(o.n===9){let pts=shrinkP(c.poly,.73);if(o.out!==undefined){const on=edgeOut(c.poly,o.out);pts=pts.map(p=>add(p,mul(on,.9)));}
+    const m=mul(add(pts[k],pts[(k+1)%3]),.5);return[{p:add(m,mul(n,.1)),n,y:y0+.2,w:.8,h:1.75}];}
+  if(o.n===8){const A=cells[o.pair[0]],Bc=cells[o.pair[1]],pc=mul(add(A.c,Bc.c),.5),dir=nrm(sub(Bc.c,A.c));
+    const along=Math.abs(n[0]*dir[0]+n[1]*dir[1])>.9,t=sub(dc.c,pc);
+    const p=along?add(pc,mul(n,2.73)):add(add(pc,mul(dir,t[0]*dir[0]+t[1]*dir[1])),mul(n,1.2));
+    return[{p,n,y:y0+.2,w:.9,h:1.85}];}
+  let cc=c.c,dn=n;
+  if(o.n===7){const on=edgeOut(c.poly,o.out);cc=add(c.c,mul(on,1.5));dn=mul(on,-1);}
+  const alongX=Math.abs(dn[0]*c.fr.x[0]+dn[1]*c.fr.x[1])>.9;
+  const half=alongX?1.2:(o.n===11?1.0:1.17),p=add(cc,mul(dn,half+.03));
+  if(o.n===6) return[{p,n:dn,y:y0+.25,w:.8,h:.75},{p,n:dn,y:y0+1.42,w:.8,h:.75,rungs:true}];
+  if(o.n===11) return[{p,n:dn,y:y0+1.12,w:.8,h:1.15,steps:true,base:y0}];
+  return[{p,n:dn,y:y0+.2,w:.85,h:1.85}];
+}
 function generate(pool,frame,sizeKey,seed,notes){
   const r=makeRng('layout|'+seed+'|'+frame+'|'+sizeKey+'|'+[...pool].join('.'));
   const {cells,cols,info}=makeCells(frame,SIZES[sizeKey],r);
@@ -406,7 +424,7 @@ function generate(pool,frame,sizeKey,seed,notes){
   const voidOpts=c=>{const o=[];if(has(21))o.push(21);if(has(23)&&c.level===0&&c.up>=0&&(!cells[c.up].occ||cells[c.up].occ.cat!=='void'))o.push(23);return o;};
   const stairOpts=c=>{if(!(c.up>=0&&free(c.up)))return[];return(c.shape==='sq'?[24,28]:[28]).filter(has);};
   const setFloor=(c,why)=>{
-    const o=floorOpts(c); let n;
+    const o=why?floorOpts(c).filter(n=>[13,14,15,20].includes(n)):floorOpts(c); let n;
     if(o.length) n=pick(r,o); else {n=14; tally.autoFloor++;}
     occ(c.id,{n,cat:'floor'}); use(n,!o.length); if(why) tally.forcedFloor++;
   };
@@ -438,13 +456,67 @@ function generate(pool,frame,sizeKey,seed,notes){
     }
   });
 
+  /* stage 4a: stairs need a floor underneath (above ground) and an opening in the floor they arrive at */
+  const baseTally={n:0};
+  cells.forEach(c=>{
+    const o=c.occ; if(!o||o.cat!=='stair'||c.level===0) return;
+    const opts=(c.shape==='sq'?[14,13,15]:[14,20]).filter(has);
+    o.base=opts.length?pick(r,opts):14; use(o.base,!opts.length); baseTally.n++;
+  });
+  const toLocal=(cell,w)=>{const d=sub(w,cell.fr.p0);return[d[0]*cell.fr.x[0]+d[1]*cell.fr.x[1],d[0]*cell.fr.z[0]+d[1]*cell.fr.z[1]];};
+  const toWorld=(cell,l)=>add(cell.fr.p0,add(mul(cell.fr.x,l[0]),mul(cell.fr.z,l[1])));
+  const addHole=(up,corners)=>{
+    const u=cells[up]; if(!u||u.shape!=='sq'||!u.occ||u.occ.cat!=='floor'||u.occ.pair) return;
+    const L=corners.map(w=>toLocal(u,w)),xs=L.map(p=>p[0]),zs=L.map(p=>p[1]);
+    const h=[Math.max(0,Math.min(...xs)),Math.min(3,Math.max(...xs)),Math.max(0,Math.min(...zs)),Math.min(3,Math.max(...zs))];
+    if(h[1]-h[0]>.05&&h[3]-h[2]>.05)(u.holes=u.holes||[]).push(h);
+  };
+  const rect=(x0,x1,z0,z1)=>[[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
+  cells.forEach(c=>{
+    const o=c.occ; if(!o||o.cat!=='stair') return;
+    if(o.n===24) addHole(c.up,rect(.36,2.22,1.59,2.79).map(l=>toWorld(c,l)));
+    else if(o.n===28&&c.shape==='sq') addHole(c.up,rect(.2,.85,.12,.62).map(l=>toWorld(c,l)));
+    else if(o.n===25&&o.main){
+      const A=cells[o.pair[0]],Bc=cells[o.pair[1]],dir=nrm(sub(Bc.c,A.c)),zv=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(zv,1.5));
+      const w=rect(1.04,4.96,1.0,2.0).map(l=>add(org,add(mul(dir,l[0]),mul(zv,l[1]))));
+      addHole(A.up,w); addHole(Bc.up,w);
+    }
+  });
+
+  /* stage 4b: every capsule needs a door and something to step onto in front of it */
+  const doors=[],balconies=[],doorSet=new Set(),acc={doors:0,deck:0,balc:0,fail:0};
+  const isWalk=id=>id>=0&&cells[id].occ&&['floor','stair'].includes(cells[id].occ.cat);
+  cells.forEach(c=>{
+    const o=c.occ; if(!o||o.cat!=='capsule') return;
+    if((o.pair||o.group)&&!o.main) return;
+    let cand=[];
+    if(o.pair) o.pair.forEach(id=>cells[id].nb.forEach((b,k)=>{if(!o.pair.includes(b))cand.push([id,k]);}));
+    else if(o.group) o.group.ids.forEach(id=>cells[id].nb.forEach((b,k)=>{if(!o.group.ids.includes(b))cand.push([id,k]);}));
+    else c.nb.forEach((b,k)=>{if(k!==o.out)cand.push([c.id,k]);});
+    const score=([id,k])=>{const b=cells[id].nb[k],lv=cells[id].level;
+      if(isWalk(b)) return 4;
+      if(lv===0&&(b<0||cells[b].occ.cat==='void')) return 3;
+      if(b>=0&&cells[b].occ&&cells[b].occ.n===21) return 2;
+      if(b<0) return 1; return 0;};
+    let best=null,bs=0; shuffle(r,cand).forEach(e=>{const sc=score(e);if(sc>bs){bs=sc;best=e;}});
+    if(!best){
+      if(!o.pair&&!o.group){counts[o.n]--;c.occ=null;setFloor(c,false);}
+      acc.fail++; return;
+    }
+    const [id,k]=best,b=cells[id].nb[k];
+    if(bs===2){counts[21]--;cells[b].occ=null;setFloor(cells[b],true);tally.forcedFloor--;acc.deck++;}
+    if(bs===1){balconies.push({id,k});use(14,true);acc.balc++;}
+    doorSpec(cells,c,o,cells[id],k).forEach(d=>doors.push(d)); acc.doors++;
+    doorSet.add(id+'|'+k);
+  });
+
   /* stage 5: roof, facade, green */
   const tops={};
   cells.forEach(c=>{if(!tops[c.col]||c.level>cells[tops[c.col]].level) tops[c.col]=c.id;});
   const roof=[];
   Object.values(tops).forEach(id=>{
     const c=cells[id]; if(!c.occ||['void','open'].includes(c.occ.cat)) return;
-    if(has(12)&&c.shape==='sq'&&r()<.25){roof.push({n:12,id});use(12);return;}
+    if(has(12)&&c.shape==='sq'&&c.occ.cat==='floor'&&!c.occ.pair&&!c.holes&&r()<.25){roof.push({n:12,id});use(12);use(28,true);return;}
     if(has(38)&&r()*100<rv.green*.5){roof.push({n:38,id});use(38);use(14,true);}
   });
   const fac=[];
@@ -452,7 +524,7 @@ function generate(pool,frame,sizeKey,seed,notes){
   if(facs.length) cells.forEach(c=>{
     if(!c.occ) return;
     if(!(c.occ.cat==='capsule'||(c.occ.cat==='floor'&&c.level>0))) return;
-    c.outer.forEach(k=>{ if(c.occ.out===k) return; if(r()*100<rv.facade){const n=pick(r,facs);fac.push({n,id:c.id,k});use(n);} });
+    c.outer.forEach(k=>{ if(c.occ.out===k||doorSet.has(c.id+'|'+k)) return; if(r()*100<rv.facade){const n=pick(r,facs);fac.push({n,id:c.id,k});use(n);} });
   });
   const greens=[];
   cells.forEach(c=>{
@@ -475,7 +547,12 @@ function generate(pool,frame,sizeKey,seed,notes){
   if(roof.some(x=>x.n===38)&&!has(14)) notes.push({t:'14 슬래브 자동 보충: 옥상 잔디 아래 받침',c:'warn'});
   if(tally.autoVoid) notes.push({t:'21 비움 자동 보충: 규칙에 맞는 원소가 없는 칸 '+tally.autoVoid+'곳',c:'warn'});
   if(tally.retry) notes.push({t:'결합 규칙 위반으로 다시 뽑은 칸 '+tally.retry+'곳'});
-  return {cells,cols,info,counts,auto,roof,fac,greens,frame};
+  if(baseTally.n) notes.push({t:'계단 밑 바닥 규칙: 2층 이상 계단 '+baseTally.n+'곳에 바닥을 깔고, 도착층 바닥에 계단 구멍을 냄',c:'ok'});
+  if(acc.doors) notes.push({t:'캡슐 출입 규칙: 문 '+acc.doors+'개'+(acc.deck?' · 문 앞 비움을 데크로 보정 '+acc.deck+'곳':'')+(acc.balc?' · 바깥 발코니 '+acc.balc+'곳':''),c:'ok'});
+  if(acc.fail) notes.push({t:'사방이 막혀 들어갈 수 없는 캡슐 '+acc.fail+'개를 데크로 교체',c:'warn'});
+  if(roof.some(x=>x.n===12)&&!has(28)) notes.push({t:'28 사다리 자동 보충: 지붕 위 캡슐로 올라가는 길',c:'warn'});
+  Object.keys(counts).forEach(k=>{if(counts[k]<=0)delete counts[k];});
+  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies};
 }
 
 /* ================= RENDER ================= */
@@ -494,12 +571,13 @@ const M={
   pot:new THREE.MeshStandardMaterial({roughness:.9}),
   soil:new THREE.MeshStandardMaterial({roughness:1}),
   paving:new THREE.MeshStandardMaterial({roughness:1}),
+  door:new THREE.MeshStandardMaterial({roughness:.5}),
   ground:new THREE.MeshStandardMaterial({roughness:1})
 };
 (function(){const c=document.createElement('canvas');c.width=552;c.height=520;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,552,520);x.fillStyle='#000';
   for(let i=5;i<552;i+=10)for(let j=5;j<520;j+=10){x.beginPath();x.arc(i,j,2.2,0,PI*2);x.fill();}M.perf.alphaMap=new THREE.CanvasTexture(c);})();
-const MAT_NAME={frame:'R1_뼈대',capsule:'R2_캡슐',deck:'R3_바닥',deckGlass:'R3_반투명바닥',stair:'R4_계단',facade:'파사드',perf:'파사드_타공',cloth:'파사드_천막',glassF:'파사드_유리',leaf:'그린_식재',pot:'그린_화분줄기',soil:'그린_토양',paving:'R3_중정포장'};
-const EXPORT_COL={frame:'#1c2125',capsule:'#a3b4dc',deck:'#cf3439',deckGlass:'#cf3439',stair:'#df7f22',facade:'#676a86',perf:'#676a86',cloth:'#676a86',glassF:'#676a86',leaf:'#3b8a4d',pot:'#5f686d',soil:'#464d52',paving:'#a5aaa8'};
+const MAT_NAME={frame:'R1_뼈대',capsule:'R2_캡슐',deck:'R3_바닥',deckGlass:'R3_반투명바닥',stair:'R4_계단',facade:'파사드',perf:'파사드_타공',cloth:'파사드_천막',glassF:'파사드_유리',leaf:'그린_식재',pot:'그린_화분줄기',soil:'그린_토양',paving:'R3_중정포장',door:'R2_캡슐문'};
+const EXPORT_COL={frame:'#1c2125',capsule:'#a3b4dc',deck:'#cf3439',deckGlass:'#cf3439',stair:'#df7f22',facade:'#676a86',perf:'#676a86',cloth:'#676a86',glassF:'#676a86',leaf:'#3b8a4d',pot:'#5f686d',soil:'#464d52',paving:'#a5aaa8',door:'#2a3550'};
 let lastSeed='';
 function exportDAE(){
   if(!root) return;
@@ -531,7 +609,7 @@ function applyColors(scene){
   M.frame.color=ink; M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
   M.deck.color=c('--deck'); M.deckGlass.color=c('--deck'); M.stair.color=c('--stair');
   ['facade','perf','cloth','glassF'].forEach(k=>M[k].color=c('--facade'));
-  M.leaf.color=c('--green'); M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35); M.paving.color=c('--muted').lerp(bg,.5);
+  M.leaf.color=c('--green'); M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35); M.paving.color=c('--muted').lerp(bg,.5); M.door.color=ink.clone().lerp(c('--capsule'),.35);
   M.ground.color=bg.clone().lerp(ink,dark?.04:.05);
   if(grid){scene.remove(grid);grid.geometry.dispose();}
   grid=new THREE.GridHelper(150,50,c('--line'),c('--line')); grid.position.y=.004; scene.add(grid);
@@ -568,6 +646,32 @@ function tree(g,x,z,r){const t=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,
   const c=new THREE.Mesh(new THREE.IcosahedronGeometry(.85+r()*.3,1),M.leaf);c.position.set(x,2.55,z);c.scale.y=.9;g.add(sh(c));}
 const shrink=(pts,f)=>{const c=cen(pts);return pts.map(p=>add(c,mul(sub(p,c),f)));};
 
+function holeSlab(g,h,mat){
+  const [x0,x1,z0,z1]=h,pcs=[[0,3,0,z0],[0,3,z1,3],[0,x0,z0,z1],[x1,3,z0,z1]];
+  pcs.forEach(([a,b,c,d])=>{if(b-a>.02&&d-c>.02)B(g,b-a,.18,d-c,(a+b)/2,.09,(c+d)/2,mat);});
+}
+function drawFlat(c,n,y0){
+  if(c.shape==='tri'){polySlab(root,c.poly,y0,.18,M.deck);return;}
+  const g=local(c.fr.p0,y0,c.fr.th);
+  if(n===13){for(let s=0;s<8;s++)B(g,.29,.08,3,.1875+s*.375,.04,1.5,M.deck);}
+  else if(n===15){for(let s=0;s<=14;s++)B(g,.03,.07,3,s*3/14,.035,1.5,M.deck);B(g,3,.07,.04,1.5,.035,0,M.deck);B(g,3,.07,.04,1.5,.035,3,M.deck);}
+  else B(g,3,.18,3,1.5,.09,1.5,M.deck);
+}
+function renderDoor(d){
+  const th=Math.atan2(d.n[0],d.n[1]),side=[d.n[1],-d.n[0]];
+  B(root,d.w,d.h,.06,d.p[0],d.y+d.h/2,d.p[1],M.door,0,th);
+  B(root,d.w*.12,.06,.05,d.p[0]+d.n[0]*.05+side[0]*d.w*.32,d.y+d.h*.48,d.p[1]+d.n[1]*.05+side[1]*d.w*.32,M.frame,0,th);
+  if(d.rungs) for(let i=1;i<=3;i++){const a=add(d.p,add(mul(d.n,.2),mul(side,.25))),b=add(d.p,add(mul(d.n,.2),mul(side,-.25))),y=d.y-1.2+i*.32;bar(root,[a[0],y,a[1]],[b[0],y,b[1]],.03,M.stair);}
+  if(d.steps) [[.67,.2],[.33,.5]].forEach(([h,o])=>{const q=add(d.p,mul(d.n,o));B(root,.9,h,.3,q[0],d.base+h/2,q[1],M.stair,0,th);});
+}
+function renderBalcony(res,bk){
+  const c=res.cells[bk.id],p=c.poly[bk.k],q=c.poly[(bk.k+1)%c.poly.length],n=edgeOut(c.poly,bk.k),L=dist(p,q),u=nrm(sub(q,p)),y0=c.level*S;
+  const mid=mul(add(p,q),.5),ctr=add(mid,mul(n,.6)),th=Math.atan2(n[0],n[1]);
+  B(root,L*.9,.18,1.2,ctr[0],y0+.09,ctr[1],M.deck,0,th);
+  const e=add(mid,mul(n,1.15)),a=add(e,mul(u,L*.44)),b=add(e,mul(u,-L*.44));
+  bar(root,[a[0],y0+1.0,a[1]],[b[0],y0+1.0,b[1]],.04,M.stair);
+  [a,b].forEach(v=>bar(root,[v[0],y0+.18,v[1]],[v[0],y0+1.0,v[1]],.04,M.stair));
+}
 function renderBody(c,res,r){
   const o=c.occ; if(!o||o.n===0) return;
   const y0=c.level*S;
@@ -604,6 +708,9 @@ function renderBody(c,res,r){
     return;
   }
   const f=c.fr,g=local(f.p0,y0,f.th);
+  if(o.cat==='floor'&&c.holes){holeSlab(g,c.holes[0],o.n===16?M.deckGlass:M.deck);return;}
+  if(o.n===7){const on=edgeOut(c.poly,o.out),lx=on[0]*f.x[0]+on[1]*f.x[1],lz=on[0]*f.z[0]+on[1]*f.z[1];
+    if(Math.abs(lx)>.5) B(g,1.5,.18,3,1.5-lx*.75,.09,1.5,M.deck); else B(g,3,.18,1.5,1.5,.09,1.5-lz*.75,M.deck);}
   switch(o.n){
     case 5: case 7: {let ox=0,oz=0;if(o.out!==undefined){const n=edgeOut(c.poly,o.out);ox=(n[0]*f.x[0]+n[1]*f.x[1])*1.5;oz=(n[0]*f.z[0]+n[1]*f.z[1])*1.5;}capRect(g,2.4,2.0,2.34,1.5+ox,.15,1.5+oz);break;}
     case 6: capRect(g,2.4,1.05,2.34,1.5,.15,1.5);capRect(g,2.4,1.05,2.34,1.5,1.3,1.5);break;
@@ -637,7 +744,8 @@ function renderFacade(f,res){
 }
 function renderAll(res,seedStr){
   const r=makeRng('render|'+seedStr),main=root,bins={};
-  const into=n=>{const name=String(n).padStart(2,'0')+'_'+byN[n].name;if(!bins[name]){bins[name]=new THREE.Group();bins[name].name=name;main.add(bins[name]);}root=bins[name];};
+  const intoName=name=>{if(!bins[name]){bins[name]=new THREE.Group();bins[name].name=name;main.add(bins[name]);}root=bins[name];};
+  const into=n=>intoName(String(n).padStart(2,'0')+'_'+byN[n].name);
   const seen=new Set();
   into(res.frame);
   res.cells.forEach(c=>{
@@ -645,9 +753,13 @@ function renderAll(res,seedStr){
     const seg=(a,b)=>{const k=[a,b].map(v=>v.map(x=>Math.round(x*100)).join(',')).sort().join('|');if(seen.has(k))return;seen.add(k);bar(root,a,b,.15);};
     for(let i=0;i<n;i++){const p=c.poly[i],q=c.poly[(i+1)%n];seg([p[0],y0,p[1]],[q[0],y0,q[1]]);seg([p[0],y0+S,p[1]],[q[0],y0+S,q[1]]);seg([p[0],y0,p[1]],[p[0],y0+S,p[1]]);}
   });
-  res.cells.forEach(c=>{if(c.occ&&c.occ.n)into(c.occ.n);renderBody(c,res,r);});
+  res.cells.forEach(c=>{if(c.occ&&c.occ.base){into(c.occ.base);drawFlat(c,c.occ.base,c.level*S);}if(c.occ&&c.occ.n)into(c.occ.n);renderBody(c,res,r);});
+  intoName('R2_캡슐 문');res.doors.forEach(renderDoor);
+  if(res.balconies.length){into(14);res.balconies.forEach(bk=>renderBalcony(res,bk));}
   res.roof.forEach(x=>{into(x.n);const c=res.cells[x.id],y=(c.level+1)*S;
-    if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);}
+    if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);B(g,3,.08,.3,1.5,.04,.15,M.deck);
+      intoName('R2_캡슐 문');const gd=local(c.fr.p0,y,c.fr.th);B(gd,.8,1.45,.06,1.5,.18+.725,.3,M.door);
+      into(28);const gl=local(c.fr.p0,c.level*S,c.fr.th);ladder(gl,.3,.12);}
     else{polySlab(root,c.poly,y,.18,M.deck);polySlab(root,shrink(c.poly,.97),y+.18,.1,M.pot);polySlab(root,shrink(c.poly,.97),y+.28,.16,M.soil);polySlab(root,shrink(c.poly,.97),y+.44,.03,M.leaf);}
   });
   res.fac.forEach(f=>{into(f.n);renderFacade(f,res);});
