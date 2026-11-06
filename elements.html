@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="모듈 파빌리온 38개 원소의 치수와 결합 규칙">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%224%22 y=%224%22 width=%2224%22 height=%2224%22 fill=%22none%22 stroke=%22%231c2125%22 stroke-width=%223%22/%3E%3Crect x=%2210%22 y=%2213%22 width=%2214%22 height=%229%22 rx=%223%22 fill=%22%232d55c6%22/%3E%3C/svg%3E">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}a.navlink{display:inline-block;margin-top:8px;font-size:13px;color:var(--capsule);text-decoration:none;font-weight:500}a.navlink:hover{text-decoration:underline}</style>
+<title>파빌리온 원소 주기율표</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: specimen sheet — large dimensioned 3D view + spec card on top, periodic table of 38 elements below (families as columns) */
+:root{
+  --bg:#eceeea; --panel:#f7f8f5; --ink:#1c2125; --muted:#5f686d; --line:#d2d7d2; --soft:#e3e6e1;
+  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:24px}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:26px;font-weight:700;margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
+.lede{color:var(--muted);margin:6px 0 0;line-height:1.6;max-width:62ch}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:2px;border:1.5px solid var(--ink);display:inline-block}
+.sw.dash{border-style:dashed;opacity:.6}
+
+.top{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+.viewer{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;height:460px;min-width:0}
+.viewer canvas{display:block;width:100%;height:100%;touch-action:none}
+.vtools{position:absolute;top:10px;left:10px;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+.vtools label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.vhint{position:absolute;bottom:10px;right:12px;font:11px var(--mono);color:var(--muted)}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.cardhead{display:flex;gap:14px;align-items:flex-start}
+.bignum{font:500 44px/1 var(--mono);font-variant-numeric:tabular-nums;color:var(--famc)}
+.cardhead h2{margin:2px 0 4px;font-size:20px;font-weight:700}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.chip.fam{border-color:var(--famc);color:var(--famc)}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+dt{color:var(--muted)}
+dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+.rule{border-top:1px solid var(--line);padding-top:12px}
+.rule h3{margin:0 0 4px;font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+.rule p{margin:0;line-height:1.6}
+.unit{font:11px var(--mono);color:var(--muted)}
+
+.tablewrap{overflow-x:auto;padding-bottom:6px}
+.ptable{display:grid;grid-template-columns:repeat(7,128px);gap:8px;width:max-content}
+.colhead{font-size:12px;font-weight:700;padding:0 2px 4px;border-bottom:2px solid var(--famc);display:flex;justify-content:space-between;align-items:baseline}
+.colhead span{font:11px var(--mono);color:var(--muted);font-weight:400}
+.tile{position:relative;display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:6px 7px 7px;cursor:pointer;font:inherit}
+.tile:hover{border-color:var(--famc)}
+.tile[aria-pressed="true"]{outline:2px solid var(--famc);outline-offset:-1px}
+.tile.later{border-style:dashed;background:transparent}
+.tile.later img{opacity:.7}
+.tile .n{font:500 13px var(--mono);color:var(--famc)}
+.tile .st{position:absolute;top:7px;right:8px;font-size:10px;color:var(--muted)}
+.tile img{width:100%;aspect-ratio:5/4;object-fit:contain;display:block;max-width:100%}
+.tile .nm{font-size:12px;font-weight:500;line-height:1.3}
+.tile .kd{font:10.5px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--capsule);outline-offset:2px}
+
+@media (max-width:900px){
+  .top{grid-template-columns:1fr}
+  .viewer{height:340px}
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">그룹 2 · 모듈 파빌리온 · 기준 칸 3,000 mm</div>
+    <h1>파빌리온 원소 주기율표</h1>
+    <p class="lede">R1~R4 규칙과 파사드·그린을 족으로 나눈 38개 원소입니다. 원소를 누르면 치수가 붙은 3D 모델과 결합 규칙을 볼 수 있어요. 점선 칸은 아직 발견 예정인 원소예요.</p>
+    <a class="navlink" href="index.html">← 조합기로 가기</a>
+    <div class="legend">
+      <span><i class="sw"></i>1차 실험</span>
+      <span><i class="sw dash"></i>발견 예정</span>
+      <span>회색 점선 상자 = 기준 칸 3,000 × 3,000 × 3,000</span>
+    </div>
+  </header>
+
+  <section class="top">
+    <div class="viewer" id="vp">
+      <canvas id="cv" aria-label="선택한 원소의 3D 모델"></canvas>
+      <div class="vtools"><label><input type="checkbox" id="dimtoggle" checked> 치수 표시</label></div>
+      <div class="vhint">드래그 회전 · 휠 확대</div>
+    </div>
+    <article class="card" id="card"></article>
+  </section>
+
+  <section>
+    <div class="tablewrap"><div class="ptable" id="ptable"></div></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const PI=Math.PI, SQ3=Math.sqrt(3);
+const FAMS=[
+  {id:'R1',name:'R1 뼈대',c:'--ink'},
+  {id:'R2',name:'R2 끼우기',c:'--capsule'},
+  {id:'R3f',name:'R3 채우기',c:'--deck'},
+  {id:'R3v',name:'R3 비우기',c:'--void'},
+  {id:'R4',name:'R4 사선',c:'--stair'},
+  {id:'Fa',name:'파사드',c:'--facade'},
+  {id:'Gr',name:'그린',c:'--green'}
+];
+
+/* ---------- materials ---------- */
+const M={
+  frame:new THREE.MeshStandardMaterial({roughness:.6,metalness:.1}),
+  capsule:new THREE.MeshStandardMaterial({roughness:.45}),
+  capLine:new THREE.LineBasicMaterial(),
+  deck:new THREE.MeshStandardMaterial({roughness:.85}),
+  deckGlass:new THREE.MeshStandardMaterial({roughness:.3,transparent:true,opacity:.4,depthWrite:false}),
+  stair:new THREE.MeshStandardMaterial({roughness:.7}),
+  facade:new THREE.MeshStandardMaterial({roughness:.7}),
+  perf:new THREE.MeshStandardMaterial({roughness:.7,side:THREE.DoubleSide,alphaTest:.5}),
+  cloth:new THREE.MeshStandardMaterial({roughness:.9,side:THREE.DoubleSide,transparent:true,opacity:.6,depthWrite:false}),
+  glassF:new THREE.MeshStandardMaterial({roughness:.1,side:THREE.DoubleSide,transparent:true,opacity:.22,depthWrite:false}),
+  leaf:new THREE.MeshStandardMaterial({roughness:.9,flatShading:true}),
+  pot:new THREE.MeshStandardMaterial({roughness:.9}),
+  soil:new THREE.MeshStandardMaterial({roughness:1}),
+  voidm:new THREE.MeshStandardMaterial({transparent:true,opacity:.07,depthWrite:false}),
+  paving:new THREE.MeshStandardMaterial({roughness:1}),
+  ghost:new THREE.LineDashedMaterial({dashSize:.14,gapSize:.1,transparent:true,opacity:.75}),
+  ghostSolid:new THREE.LineBasicMaterial({transparent:true,opacity:.6}),
+  dim:new THREE.LineBasicMaterial(),
+  ground:new THREE.MeshStandardMaterial({roughness:1})
+};
+(function perfTex(){
+  const c=document.createElement('canvas'); c.width=552; c.height=520;
+  const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.fillStyle='#000';
+  for(let i=5;i<c.width;i+=10)for(let j=5;j<c.height;j+=10){x.beginPath();x.arc(i,j,2.2,0,PI*2);x.fill();}
+  M.perf.alphaMap=new THREE.CanvasTexture(c);
+})();
+
+function tok(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+let INK='#1c2125', PANEL='#f7f8f5';
+function applyColors(){
+  const c=n=>new THREE.Color(tok(n));
+  const bg=c('--panel'), ink=c('--ink'), dark=bg.getHSL({}).l<.5;
+  INK=tok('--ink'); PANEL=tok('--panel');
+  M.frame.color=ink;
+  M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
+  M.deck.color=c('--deck'); M.deckGlass.color=c('--deck');
+  M.stair.color=c('--stair');
+  M.facade.color=c('--facade'); M.perf.color=c('--facade'); M.cloth.color=c('--facade'); M.glassF.color=c('--facade');
+  M.leaf.color=c('--green');
+  M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35);
+  M.voidm.color=c('--void'); M.paving.color=c('--muted').lerp(bg,.5);
+  M.ghost.color=c('--void'); M.ghostSolid.color=c('--void');
+  M.dim.color=ink;
+  M.ground.color=bg.clone().lerp(ink,dark?.03:.04);
+}
+
+/* ---------- geometry helpers (metres) ---------- */
+const UNIT=new THREE.BoxGeometry(1,1,1); UNIT.userData.shared=true;
+const UP=new THREE.Vector3(0,1,0);
+const V=a=>new THREE.Vector3(a[0],a[1],a[2]);
+function sh(m){m.castShadow=!m.material.transparent; m.receiveShadow=true; return m;}
+function B(g,w,h,d,x,y,z,mat,rz,ry){const m=new THREE.Mesh(UNIT,mat);m.scale.set(w,h,d);m.position.set(x,y,z);if(rz)m.rotation.z=rz;if(ry)m.rotation.y=ry;g.add(sh(m));return m;}
+function bar(g,p,q,t,mat){
+  const a=V(p),b=V(q),d=b.clone().sub(a),L=d.length();
+  const m=new THREE.Mesh(UNIT,mat||M.frame); m.scale.set(t,L+t,t);
+  m.position.copy(a).add(b).multiplyScalar(.5); m.quaternion.setFromUnitVectors(UP,d.normalize());
+  g.add(sh(m)); return m;
+}
+function cubeFrame(g,x,y,z,s,t){
+  const P=(i,j,k)=>[x+i*s,y+j*s,z+k*s];
+  for(const a of[0,1])for(const b of[0,1]){bar(g,P(0,a,b),P(1,a,b),t);bar(g,P(a,0,b),P(a,1,b),t);bar(g,P(a,b,0),P(a,b,1),t);}
+}
+function lines(g,segs,mat){
+  const arr=[]; segs.forEach(s=>arr.push(...s[0],...s[1]));
+  const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));
+  const l=new THREE.LineSegments(geo,mat||M.ghost); if(l.material.isLineDashedMaterial) l.computeLineDistances(); g.add(l); return l;
+}
+function ghostBox(g,x,y,z,w,h,d){
+  const P=(i,j,k)=>[x+i*w,y+j*h,z+k*d], s=[];
+  for(const a of[0,1])for(const b of[0,1]){s.push([P(0,a,b),P(1,a,b)],[P(a,0,b),P(a,1,b)],[P(a,b,0),P(a,b,1)]);}
+  lines(g,s);
+}
+function ghostPrism(g,pts,y0,h){
+  const s=[],n=pts.length;
+  for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%n];
+    s.push([[a[0],y0,a[1]],[b[0],y0,b[1]]],[[a[0],y0+h,a[1]],[b[0],y0+h,b[1]]],[[a[0],y0,a[1]],[a[0],y0+h,a[1]]]);}
+  lines(g,s);
+}
+function prismFrame(g,pts,y0,h,t){
+  const n=pts.length;
+  for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%n];
+    bar(g,[a[0],y0,a[1]],[b[0],y0,b[1]],t); bar(g,[a[0],y0+h,a[1]],[b[0],y0+h,b[1]],t); bar(g,[a[0],y0,a[1]],[a[0],y0+h,a[1]],t);}
+}
+const hexPts=(a,cx=0,cz=0)=>[0,1,2,3,4,5].map(k=>[cx+a*Math.cos(k*PI/3),cz+a*Math.sin(k*PI/3)]);
+const triPts=(a,cx=0,cz=0)=>{const R=a/SQ3;return[-90,30,150].map(d=>[cx+R*Math.cos(d*PI/180),cz+R*Math.sin(d*PI/180)]);};
+function polySlab(g,pts,y0,t,mat){
+  const s=new THREE.Shape(); pts.forEach((p,i)=>i?s.lineTo(p[0],-p[1]):s.moveTo(p[0],-p[1]));
+  const geo=new THREE.ExtrudeGeometry(s,{depth:t,bevelEnabled:false}); geo.rotateX(-PI/2); geo.translate(0,y0,0);
+  const m=new THREE.Mesh(geo,mat); g.add(sh(m)); return m;
+}
+function roundedPoly(pts,r){
+  const n=pts.length,A=[],Bp=[];
+  for(let i=0;i<n;i++){
+    const c=pts[i],p=pts[(i-1+n)%n],q=pts[(i+1)%n];
+    const v1=[p[0]-c[0],p[1]-c[1]],v2=[q[0]-c[0],q[1]-c[1]];
+    const l1=Math.hypot(...v1),l2=Math.hypot(...v2);
+    A[i]=[c[0]+v1[0]/l1*r,c[1]+v1[1]/l1*r]; Bp[i]=[c[0]+v2[0]/l2*r,c[1]+v2[1]/l2*r];
+  }
+  const s=new THREE.Shape(); s.moveTo(A[0][0],A[0][1]);
+  for(let i=0;i<n;i++){s.quadraticCurveTo(pts[i][0],pts[i][1],Bp[i][0],Bp[i][1]); const a=A[(i+1)%n]; s.lineTo(a[0],a[1]);}
+  return s;
+}
+function outline(g,geo,pos){const l=new THREE.LineSegments(new THREE.EdgesGeometry(geo,35),M.capLine); if(pos) l.position.copy(pos); g.add(l);}
+function capRect(g,w,h,d,cx,y0,cz){
+  const b=.07,iw=w-2*b,ih=h-2*b,r=Math.min(iw,ih)*.28;
+  const geo=new THREE.ExtrudeGeometry(roundedPoly([[-iw/2,-ih/2],[iw/2,-ih/2],[iw/2,ih/2],[-iw/2,ih/2]],r),{depth:d-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:8});
+  geo.translate(0,0,-(d-2*b)/2);
+  const m=new THREE.Mesh(geo,M.capsule); m.position.set(cx,y0+h/2,cz); g.add(sh(m)); outline(g,geo,m.position);
+}
+function capPrism(g,pts,y0,h,r){
+  const b=.07;
+  const geo=new THREE.ExtrudeGeometry(roundedPoly(pts.map(p=>[p[0],-p[1]]),r),{depth:h-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:8});
+  geo.rotateX(-PI/2); geo.translate(0,y0+b,0);
+  const m=new THREE.Mesh(geo,M.capsule); g.add(sh(m)); outline(g,geo);
+}
+function shrub(g,x,y,z,r){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(r,0),M.leaf);m.position.set(x,y,z);g.add(sh(m));}
+function mkRng(seed){let a=seed;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function edgeOut(pts,k,len){ /* outward normal of edge k scaled */
+  const a=pts[k],b=pts[(k+1)%pts.length],cx=pts.reduce((s,p)=>s+p[0],0)/pts.length,cz=pts.reduce((s,p)=>s+p[1],0)/pts.length;
+  let nx=b[1]-a[1],nz=-(b[0]-a[0]); const l=Math.hypot(nx,nz); nx/=l; nz/=l;
+  const mx=(a[0]+b[0])/2-cx,mz=(a[1]+b[1])/2-cz; if(nx*mx+nz*mz<0){nx=-nx;nz=-nz;}
+  return[nx*len,nz*len];
+}
+
+/* dimension lines */
+const labelTex=[];
+function label(g,text,pos){
+  const c=document.createElement('canvas'),x=c.getContext('2d'),fs=40;
+  x.font='500 '+fs+'px "IBM Plex Mono", monospace';
+  const w=Math.ceil(x.measureText(text).width)+28,h=60; c.width=w; c.height=h;
+  x.font='500 '+fs+'px "IBM Plex Mono", monospace';
+  x.fillStyle=PANEL; x.globalAlpha=.85; x.fillRect(0,0,w,h); x.globalAlpha=1;
+  x.fillStyle=INK; x.textBaseline='middle'; x.textAlign='center'; x.fillText(text,w/2,h/2+2);
+  const t=new THREE.CanvasTexture(c); labelTex.push(t);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
+  s.scale.set(w/h*.3,.3,1); s.position.copy(pos); s.renderOrder=20; g.add(s);
+}
+function dim(g,p1,p2,off,text){
+  const a=V(p1),b=V(p2),o=V(off),on=o.clone().normalize();
+  const a2=a.clone().add(o),b2=b.clone().add(o);
+  const dir=b2.clone().sub(a2).normalize(),tk=dir.clone().add(on).normalize().multiplyScalar(.09);
+  const P=v=>[v.x,v.y,v.z];
+  const segs=[
+    [P(a.clone().addScaledVector(on,.06)),P(a2.clone().addScaledVector(on,.12))],
+    [P(b.clone().addScaledVector(on,.06)),P(b2.clone().addScaledVector(on,.12))],
+    [P(a2),P(b2)],
+    [P(a2.clone().sub(tk)),P(a2.clone().add(tk))],[P(b2.clone().sub(tk)),P(b2.clone().add(tk))]
+  ];
+  const l=lines(g,segs,M.dim); l.renderOrder=19;
+  label(g,text,a2.clone().add(b2).multiplyScalar(.5).addScaledVector(on,.24));
+}
+
+/* V-stair used by element 24 */
+function vStair(g,x0,y0,z0){
+  const S=3,n=7,L=S*.62,rise=S/2/n,run=L/n,xs=x0+S*.12,w=1.2,zA=z0+S*.27,zB=z0+S*.73;
+  for(let s=0;s<n;s++) B(g,run*1.02,.06,w,xs+run*(s+.5),y0+rise*(s+1),zA,M.stair);
+  B(g,S*.2,.08,S*.86,xs+L+S*.1,y0+S/2,z0+S/2,M.stair);
+  for(let s=0;s<n;s++) B(g,run*1.02,.06,w,xs+L-run*(s+.5),y0+S/2+rise*(s+1),zB,M.stair);
+  const len=Math.hypot(L,S/2),a=Math.atan2(S/2,L);
+  B(g,len,.16,.05,xs+L/2,y0+S/4,zA-w/2,M.stair,a);
+  B(g,len,.16,.05,xs+L/2,y0+S*.75,zB+w/2,M.stair,-a);
+}
+
+/* ---------- 38 elements ---------- */
+const T=.15;
+const E=[
+/* R1 */
+{n:1,f:'R1',name:'사각 프레임',st:1,key:'3,000³',
+ b:g=>cubeFrame(g,0,0,0,3,T),
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,0,0],[3,0,3],[.7,0,0],'3,000');dim(g,[0,0,3],[0,3,3],[-.7,0,0],'3,000');},
+ spec:[['칸','3,000 × 3,000 × 3,000'],['기둥·보','□150 × 150 각관'],['접합','볼트 접합, 모든 변 동일'],['내부 칸','정사각 1칸']],
+ rule:'모든 사각 모듈이 들어가는 기본 칸. 위와 옆으로 같은 칸을 반복해 틀을 만듭니다.'},
+{n:2,f:'R1',name:'육각 프레임',st:1,key:'변 3,000',
+ b:g=>{const h=hexPts(3);prismFrame(g,h,0,3,T);bar(g,[0,0,0],[0,3,0],T);h.forEach(p=>{bar(g,[0,0,0],[p[0],0,p[1]],T*.8);bar(g,[0,3,0],[p[0],3,p[1]],T*.8);});},
+ d:g=>{const h=hexPts(3),o=edgeOut(h,0,.7);dim(g,[h[0][0],0,h[0][1]],[h[1][0],0,h[1][1]],[o[0],0,o[1]],'3,000');dim(g,[-3,0,0],[3,0,0],[0,0,-3.3],'6,000');dim(g,[h[1][0],0,h[1][1]],[h[1][0],3,h[1][1]],[.35,0,.6],'3,000');},
+ spec:[['변 길이','3,000'],['맞꼭짓점 / 맞변','6,000 / 5,196'],['높이','3,000'],['부재','□150, 중심 기둥 1'],['내부 칸','정삼각 6칸 (각 3.90 m²)']],
+ rule:'내부는 삼각 칸 6개. 여러 개가 변을 공유하며 무작위로 이어 붙습니다.'},
+{n:3,f:'R1',name:'사각+육각 연결',st:0,key:'변 3,000 · 4면 합 360°',
+ b:g=>{const h=hexPts(3);prismFrame(g,h,0,3,T);
+   const n0=edgeOut(h,0,3),n1=edgeOut(h,1,3),V0=h[0],V1=h[1],V2=h[2];
+   const sq0=[V0,V1,[V1[0]+n0[0],V1[1]+n0[1]],[V0[0]+n0[0],V0[1]+n0[1]]];
+   const sq1=[V1,V2,[V2[0]+n1[0],V2[1]+n1[1]],[V1[0]+n1[0],V1[1]+n1[1]]];
+   const tri=[V1,[V1[0]+n0[0],V1[1]+n0[1]],[V1[0]+n1[0],V1[1]+n1[1]]];
+   prismFrame(g,sq0,0,3,T);prismFrame(g,sq1,0,3,T);prismFrame(g,tri,0,3,T);
+   polySlab(g,tri,0,.05,M.deckGlass);},
+ d:g=>{const h=hexPts(3),o=edgeOut(h,3,.7);dim(g,[h[3][0],0,h[3][1]],[h[4][0],0,h[4][1]],[o[0],0,o[1]],'3,000');dim(g,[h[4][0],0,h[4][1]],[h[4][0],3,h[4][1]],[-.4,0,-.6],'3,000');},
+ spec:[['공통 변','3,000'],['꼭짓점 각','120° + 90° + 90° + 60° = 360°'],['연결부','정삼각 칸 (빨간 바닥)'],['배치','3.4.6.4 타일링']],
+ rule:'사각과 육각이 만나는 꼭짓점에는 반드시 삼각 연결부가 끼어야 합니다. 삼각 칸에는 계단이나 작은 데크가 들어갈 수 있어요.'},
+{n:4,f:'R1',name:'엇쌓기 사각',st:0,key:'엇갈림 1,500',
+ b:g=>{cubeFrame(g,0,0,0,3,T);cubeFrame(g,1.5,3,0,3,T);},
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,3,3],[4.5,3,3],[0,0,.7],'1,500');dim(g,[0,0,3],[0,3,3],[-.7,0,0],'3,000');},
+ spec:[['칸','3,000³ × 2'],['엇갈림','1,500 (½칸)'],['캔틸레버','1,500'],['부재','□150']],
+ rule:'위층이 반 칸씩 밀려 아래에 처마와 그늘이 생깁니다. 돌출부 아래는 비움 또는 데크만 가능해요.'},
+/* R2 */
+{n:5,f:'R2',name:'캡슐 단층',st:1,key:'2,400×2,340×2,000',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);capRect(g,2.4,2.0,2.34,1.5,.15,1.5);},
+ d:g=>{dim(g,[.3,.15,2.67],[2.7,.15,2.67],[0,0,.7],'2,400');dim(g,[.3,.15,2.67],[.3,2.15,2.67],[-.7,0,0],'2,000');dim(g,[2.7,2.15,.33],[2.7,2.15,2.67],[.7,0,0],'2,340');},
+ spec:[['외형 W×D×H','2,400 × 2,340 × 2,000'],['모서리','R 400'],['외피','FRP 또는 알루미늄 패널'],['바닥 레벨','+150 (보 위)']],
+ rule:'칸 하나에 하나. 아래에 보나 바닥이 있어야 합니다.'},
+{n:6,f:'R2',name:'캡슐 2단',st:1,key:'H 1,050 × 2',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);capRect(g,2.4,1.05,2.34,1.5,.15,1.5);capRect(g,2.4,1.05,2.34,1.5,1.3,1.5);},
+ d:g=>{dim(g,[.3,.15,2.67],[2.7,.15,2.67],[0,0,.7],'2,400');dim(g,[.3,.15,2.67],[.3,1.2,2.67],[-.7,0,0],'1,050');dim(g,[.3,1.3,2.67],[.3,2.35,2.67],[-.7,0,0],'1,050');},
+ spec:[['외형 (개당)','2,400 × 2,340 × 1,050'],['간격','100'],['전체 높이','2,200'],['용도','수면·수납 포드']],
+ rule:'한 칸을 위아래로 나눠 씁니다. 스케치 R3 왼쪽 칸과 같은 구성이에요.'},
+{n:7,f:'R2',name:'돌출 캡슐',st:1,key:'돌출 1,200',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);capRect(g,2.4,2.0,2.34,3.0,.15,1.5);},
+ d:g=>{dim(g,[3,2.15,2.67],[4.2,2.15,2.67],[0,.6,0],'1,200');dim(g,[1.8,.15,2.67],[4.2,.15,2.67],[0,0,.7],'2,400');dim(g,[0,0,3],[3,0,3],[0,0,1.5],'3,000');},
+ spec:[['외형','2,400 × 2,340 × 2,000'],['캔틸레버','1,200 (캡슐 폭의 ½)'],['지지','칸 안쪽 1,200 + 보 걸침'],['방향','바깥에 면한 변 쪽']],
+ rule:'R2 끼우기. 바깥에 면한 변으로만 돌출하고, 돌출한 면에는 파사드가 붙지 않습니다.'},
+{n:8,f:'R2',name:'두 칸 관통 캡슐',st:0,key:'5,400×2,340×2,000',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);ghostBox(g,3,0,0,3,3,3);capRect(g,5.4,2.0,2.34,3,.15,1.5);},
+ d:g=>{dim(g,[.3,.15,2.67],[5.7,.15,2.67],[0,0,.7],'5,400');dim(g,[0,0,3],[6,0,3],[0,0,1.5],'6,000');},
+ spec:[['외형','5,400 × 2,340 × 2,000'],['차지 칸','가로 2칸'],['중간 기둥','앞뒤 기둥 사이를 지남'],['용도','긴 거실·작업실']],
+ rule:'가로로 이웃한 두 칸이 모두 비어 있을 때만 들어갑니다.'},
+{n:9,f:'R2',name:'삼각 캡슐',st:0,key:'변 2,200 · H 2,000',
+ b:g=>{ghostPrism(g,triPts(3),0,3);capPrism(g,triPts(2.2),.15,2.0,.3);},
+ d:g=>{const t=triPts(2.2);dim(g,[t[2][0],.15,t[2][1]],[t[1][0],.15,t[1][1]],[0,0,.9],'2,200');dim(g,[t[1][0],.15,t[1][1]],[t[1][0],2.15,t[1][1]],[.8,0,.2],'2,000');},
+ spec:[['평면','정삼각 변 2,200'],['높이','2,000'],['모서리','R 300'],['들어가는 칸','육각 틀의 삼각 칸 1개']],
+ rule:'육각 틀 안 삼각 칸 전용. 바깥에 면한 변 쪽으로 돌출할 수 있어요.'},
+{n:10,f:'R2',name:'육각 포드',st:0,key:'변 2,400 · H 2,400',
+ b:g=>{ghostPrism(g,hexPts(3),0,3);capPrism(g,hexPts(2.4),.15,2.4,.35);},
+ d:g=>{const h=hexPts(2.4),o=edgeOut(h,0,.9);dim(g,[h[0][0],.15,h[0][1]],[h[1][0],.15,h[1][1]],[o[0],0,o[1]],'2,400');dim(g,[2.4,.15,0],[2.4,2.55,0],[1.0,0,0],'2,400');},
+ spec:[['평면','정육각 변 2,400'],['높이','2,400'],['면적','약 15.0 m²'],['차지 칸','삼각 6칸 전체']],
+ rule:'육각 틀의 삼각 6칸이 모두 비어 있을 때 하나로 합쳐 들어갑니다.'},
+{n:11,f:'R2',name:'매달린 캡슐',st:0,key:'이격 1,000',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);bar(g,[0,3,.7],[3,3,.7],T);bar(g,[0,3,2.3],[3,3,2.3],T);
+   capRect(g,2.4,1.4,2.0,1.5,1.0,1.5);[[.6,.7],[2.4,.7],[.6,2.3],[2.4,2.3]].forEach(p=>bar(g,[p[0],2.35,p[1]],[p[0],3,p[1]],.03));},
+ d:g=>{dim(g,[.3,0,2.5],[.3,1.0,2.5],[-.7,0,0],'1,000');dim(g,[.3,1.0,2.5],[.3,2.4,2.5],[-.7,0,0],'1,400');dim(g,[.3,1.0,2.5],[2.7,1.0,2.5],[0,0,.8],'2,400');},
+ spec:[['외형','2,400 × 2,000 × 1,400'],['바닥 이격','1,000'],['행거','Ø20 강봉 × 4'],['상부 보','□150 × 2']],
+ rule:'위쪽 보가 있는 칸에만. 아래 1,000은 비움이라 그 밑으로 동선이 지나갈 수 있어요.'},
+{n:12,f:'R2',name:'지붕 위 캡슐',st:0,key:'H 1,800 · +3,000',
+ b:g=>{cubeFrame(g,0,0,0,3,T);capRect(g,2.4,1.8,2.34,1.5,3.08,1.5);},
+ d:g=>{dim(g,[0,0,3],[0,3,3],[-.7,0,0],'3,000');dim(g,[.3,3.08,2.67],[.3,4.88,2.67],[-.7,0,0],'1,800');dim(g,[.3,3.08,2.67],[2.7,3.08,2.67],[0,0,.7],'2,400');},
+ spec:[['외형','2,400 × 2,340 × 1,800'],['설치 레벨','+3,000 (틀 꼭대기)'],['지지','상부 보 4변'],['용도','전망 포드']],
+ rule:'틀의 가장 높은 칸 위에만. 그 칸 바로 아래는 비움이면 안 됩니다.'},
+/* R3 fill */
+{n:13,f:'R3f',name:'목재 슬랫 데크',st:1,key:'3,000² · t80',
+ b:g=>{for(let s=0;s<8;s++)B(g,.29,.08,3,.1875+s*.375,.04,1.5,M.deck);},
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,0,0],[3,0,3],[.7,0,0],'3,000');dim(g,[.0425,.08,0],[.3325,.08,0],[0,0,-.6],'290');},
+ spec:[['크기','3,000 × 3,000'],['판재','290 × 80, 8장'],['간격','85'],['재료','방부목 / 탄화목']],
+ rule:'R3 채우기. 2층 이상이면 플랜터(35)를 올릴 수 있어요.'},
+{n:14,f:'R3f',name:'슬래브',st:1,key:'3,000² · t180',
+ b:g=>B(g,3,.18,3,1.5,.09,1.5,M.deck),
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,0,0],[3,0,3],[.7,0,0],'3,000');dim(g,[0,0,3],[0,.18,3],[-.7,0,0],'180');},
+ spec:[['크기','3,000 × 3,000'],['두께','180'],['재료','CLT 또는 데크플레이트'],['하중','무거운 원소 지지용']],
+ rule:'캡슐·옥상 잔디처럼 무거운 원소의 아래에 우선 배치합니다.'},
+{n:15,f:'R3f',name:'그레이팅',st:0,key:'@214 · H70',
+ b:g=>{for(let s=0;s<=14;s++)B(g,.03,.07,3,s*3/14,.035,1.5,M.deck);B(g,3,.07,.04,1.5,.035,0,M.deck);B(g,3,.07,.04,1.5,.035,3,M.deck);},
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[0,.07,0],[3/14,.07,0],[0,0,-.6],'214');},
+ spec:[['크기','3,000 × 3,000'],['바','30 × 70 @ 214'],['재료','아연도금 강재'],['특징','빛과 빗물 통과']],
+ rule:'아래층에 빛을 떨어뜨리고 싶을 때. 아래 칸이 비움이면 효과가 커요.'},
+{n:16,f:'R3f',name:'반투명 바닥',st:0,key:'t60 · 투과',
+ b:g=>{B(g,3,.06,3,1.5,.03,1.5,M.deckGlass);[[1.5,0,3,.05],[1.5,3,3,.05]].forEach(p=>B(g,p[2],.08,p[3],p[0],.04,p[1],M.deck));B(g,.05,.08,3,0,.04,1.5,M.deck);B(g,.05,.08,3,3,.04,1.5,M.deck);},
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,0,0],[3,0,3],[.7,0,0],'3,000');},
+ spec:[['크기','3,000 × 3,000'],['판','폴리카보네이트 t60'],['테두리','50 × 80 프레임'],['특징','위아래 시선 연결']],
+ rule:'캡슐 바로 위·아래에는 쓰지 않습니다. 사생활 경계가 무너져요.'},
+{n:17,f:'R3f',name:'반층 데크',st:0,key:'단차 1,500',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);B(g,3,.18,1.5,1.5,.09,2.25,M.deck);B(g,3,.18,1.5,1.5,1.59,.75,M.deck);},
+ d:g=>{dim(g,[3,0,1.5],[3,1.5,1.5],[.7,0,0],'1,500');dim(g,[3,1.68,0],[3,1.68,1.5],[.7,0,0],'1,500');dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');},
+ spec:[['크기','3,000 × 1,500 × 2'],['단차','1,500 (½층)'],['두께','180'],['연결','경사로(27)·사다리(28)']],
+ rule:'한 칸 안에 바닥 두 장을 반 층 차이로. 스킵플로어 동선을 만듭니다.'},
+{n:18,f:'R3f',name:'경사 데크',st:0,key:'1:6 · 9.5°',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);B(g,Math.hypot(3,.5),.18,3,1.5,.25+.09,1.5,M.deck,Math.atan2(.5,3));},
+ d:g=>{dim(g,[3,0,3],[3,.5,3],[.7,0,0],'500');dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');},
+ spec:[['크기','3,000 × 3,000'],['오름','500 (1:6, 9.5°)'],['두께','180'],['용도','앉는 계단식 데크']],
+ rule:'이웃 칸과 높이를 500씩 이어줍니다. 경사로(27)보다 가팔라 걷기보다 앉는 자리예요.'},
+{n:19,f:'R3f',name:'마름모 데크',st:0,key:'변 3,000 · 60°/120°',
+ b:g=>{const r=[[0,0],[3,0],[4.5,2.598],[1.5,2.598]];polySlab(g,r,0,.18,M.deck);lines(g,[[[3,.19,0],[1.5,.19,2.598]]],M.ghostSolid);},
+ d:g=>{dim(g,[0,0,0],[3,0,0],[0,0,-.7],'3,000');dim(g,[3,0,0],[4.5,0,2.598],[.6,0,-.35],'3,000');},
+ spec:[['평면','마름모 변 3,000'],['내각','60° / 120°'],['면적','7.79 m² (삼각 2칸)'],['두께','180']],
+ rule:'삼각 칸 2개가 이웃해 비어 있을 때 하나로 덮습니다.'},
+{n:20,f:'R3f',name:'삼각 데크',st:0,key:'변 3,000 · 3.90 m²',
+ b:g=>polySlab(g,[[0,0],[3,0],[1.5,2.598]],0,.18,M.deck),
+ d:g=>{dim(g,[0,0,0],[3,0,0],[0,0,-.7],'3,000');dim(g,[3,0,0],[1.5,0,2.598],[.6,0,.35],'3,000');},
+ spec:[['평면','정삼각 변 3,000'],['면적','3.90 m²'],['두께','180'],['들어가는 칸','삼각 칸·연결부']],
+ rule:'육각 틀의 삼각 칸과 사각+육각 연결부(3)에 들어갑니다.'},
+/* R3 void */
+{n:21,f:'R3v',name:'비움',st:1,key:'27 m³',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);B(g,3,3,3,1.5,1.5,1.5,M.voidm);},
+ d:g=>{dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');dim(g,[3,0,0],[3,0,3],[.7,0,0],'3,000');dim(g,[0,0,3],[0,3,3],[-.7,0,0],'3,000');},
+ spec:[['체적','3,000³ = 27 m³'],['구조','뼈대만 남김'],['효과','빛·바람·시선 통과']],
+ rule:'R3 비우기. 1층 비움에는 나무(36)가 들어갈 수 있어요.'},
+{n:22,f:'R3v',name:'중정',st:0,key:'23.4 m²',
+ b:g=>{const h=hexPts(3);ghostPrism(g,h,0,3);polySlab(g,h,0,.04,M.paving);const s=[];h.forEach(p=>s.push([[0,.05,0],[p[0],.05,p[1]]]));lines(g,s,M.ghostSolid);},
+ d:g=>{const h=hexPts(3),o=edgeOut(h,0,.7);dim(g,[h[0][0],0,h[0][1]],[h[1][0],0,h[1][1]],[o[0],0,o[1]],'3,000');},
+ spec:[['평면','정육각 변 3,000'],['면적','23.4 m²'],['조건','삼각 6칸 모두 비움'],['바닥','포장 또는 잔디']],
+ rule:'육각 틀의 6칸이 모두 비면 자동으로 중정이 됩니다. 둘레 칸이 채워질수록 마당 느낌이 강해져요.'},
+{n:23,f:'R3v',name:'필로티',st:0,key:'순높이 2,820',
+ b:g=>{cubeFrame(g,0,0,0,3,T);B(g,3,.18,3,1.5,2.91,1.5,M.deck);},
+ d:g=>{dim(g,[0,0,3],[0,2.82,3],[-.7,0,0],'2,820');dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');},
+ spec:[['순높이','2,820'],['상부','슬래브 t180'],['1층','완전 개방']],
+ rule:'1층 칸 전용. 위 칸이 채워져 있어야 의미가 생깁니다.'},
+/* R4 */
+{n:24,f:'R4',name:'V자 계단',st:1,key:'14단 · 214',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);vStair(g,0,0,0);},
+ d:g=>{dim(g,[0,0,3],[0,3,3],[-.7,0,0],'3,000');dim(g,[3,0,3],[3,1.5,3],[.7,0,0],'1,500');dim(g,[.36,0,3],[2.22,0,3],[0,0,.7],'1,860');},
+ spec:[['층고','3,000'],['단','7 + 7단, 단높이 214'],['단너비','266'],['유효폭','1,200'],['중간참','+1,500']],
+ rule:'R4 사선. 위 칸이 있어야 하고, 위 칸은 자동으로 데크가 됩니다.'},
+{n:25,f:'R4',name:'직선 계단',st:0,key:'37° · 폭 1,000',
+ b:g=>{ghostBox(g,0,0,0,3,3,3);ghostBox(g,3,0,0,3,3,3);const n=14,r=3/n,t=.28,x0=1.04;
+   for(let s=0;s<n;s++)B(g,t,.05,1.0,x0+t*(s+.5),r*(s+1),1.5,M.stair);
+   const L=Math.hypot(n*t,3),a=Math.atan2(3,n*t);B(g,L,.2,.05,x0+n*t/2,1.5,1.0,M.stair,a);B(g,L,.2,.05,x0+n*t/2,1.5,2.0,M.stair,a);},
+ d:g=>{dim(g,[1.04,0,2.0],[4.96,0,2.0],[0,0,1.6],'3,920');dim(g,[4.96,0,2.0],[4.96,3,2.0],[.8,0,0],'3,000');},
+ spec:[['층고','3,000'],['단','14단, 단높이 214 / 단너비 280'],['길이','3,920 (가로 2칸)'],['경사','37°'],['유효폭','1,000']],
+ rule:'가로로 이웃한 두 칸이 필요해요. 사각 틀에서 R4를 길게 늘인 버전입니다.'},
+{n:26,f:'R4',name:'나선 계단',st:0,key:'R 1,500 · 18단',
+ b:g=>{ghostPrism(g,hexPts(3),0,3);bar(g,[0,0,0],[0,3,0],.2,M.stair);
+   for(let i=0;i<18;i++){const a=i*20*PI/180,m=B(g,1.4,.05,.36,.8*Math.cos(a),(i+1)*3/18,.8*Math.sin(a),M.stair);m.rotation.y=-a;}},
+ d:g=>{dim(g,[0,0,0],[1.5,0,0],[0,0,-1.2],'R 1,500');dim(g,[3,0,0],[3,3,0],[.8,0,0],'3,000');},
+ spec:[['반경','1,500'],['단','18단, 단높이 167'],['회전','360°'],['중심 기둥','Ø200']],
+ rule:'육각 틀 중심 기둥을 돌아 오릅니다. 육각 6칸 중 중심을 공유하는 칸들이 비어야 해요.'},
+{n:27,f:'R4',name:'경사로',st:0,key:'1:12 · 6,000',
+ b:g=>{const a=Math.atan2(.5,6);B(g,Math.hypot(6,.5),.15,1.2,3,.25+.075,.6,M.stair,a);
+   bar(g,[0,1.05,0],[6,1.55,0],.04,M.stair);bar(g,[0,1.05,1.2],[6,1.55,1.2],.04,M.stair);
+   [[0,0],[0,1.2],[6,0],[6,1.2]].forEach(p=>bar(g,[p[0],p[0]?.5:0,p[1]],[p[0],p[0]?1.55:1.05,p[1]],.04,M.stair));},
+ d:g=>{dim(g,[0,0,1.2],[6,0,1.2],[0,0,.7],'6,000');dim(g,[6,0,1.2],[6,.5,1.2],[.7,0,0],'500');dim(g,[6,.5,0],[6,.5,1.2],[.7,0,0],'1,200');},
+ spec:[['길이','6,000 (가로 2칸)'],['오름','500 (1:12)'],['폭','1,200'],['난간','H 900']],
+ rule:'반층(17)·경사 데크(18)를 잇는 무장애 동선. 층 전체(3,000)는 오르지 못해요.'},
+{n:28,f:'R4',name:'사다리',st:0,key:'@300 · W450',
+ b:g=>{bar(g,[0,0,0],[0,3,0],.035,M.stair);bar(g,[.45,0,0],[.45,3,0],.035,M.stair);for(let i=1;i<=9;i++)bar(g,[0,i*.3,0],[.45,i*.3,0],.03,M.stair);},
+ d:g=>{dim(g,[0,0,0],[0,3,0],[-.5,0,0],'3,000');dim(g,[0,0,0],[.45,0,0],[0,0,.5],'450');dim(g,[.45,.3,0],[.45,.6,0],[.45,0,0],'300');},
+ spec:[['높이','3,000'],['폭','450'],['디딤 간격','300 (9개)'],['부재','Ø30 강관']],
+ rule:'가장 작은 사선 원소. 캡슐 2단(6)의 위 칸이나 지붕 위 캡슐(12)로 올라갈 때 씁니다.'},
+/* Facade */
+{n:29,f:'Fa',name:'루버',st:1,key:'핀 250 @430',
+ b:g=>{lines(g,[[[0,.2,0],[3,.2,0]],[[3,.2,0],[3,2.8,0]],[[3,2.8,0],[0,2.8,0]],[[0,2.8,0],[0,.2,0]]]);for(let i=0;i<7;i++)B(g,.04,2.6,.25,.21+i*.43,1.5,.125,M.facade);},
+ d:g=>{dim(g,[0,.2,.25],[3,.2,.25],[0,-.6,0],'3,000');dim(g,[3,.2,.25],[3,2.8,.25],[.6,0,0],'2,600');dim(g,[.21,2.8,.25],[.64,2.8,.25],[0,.5,0],'430');},
+ spec:[['면 크기','3,000 × 2,600'],['핀','40 × 250 × 2,600'],['간격','430 (7개)'],['재료','목재 / 알루미늄']],
+ rule:'캡슐·데크 칸의 바깥 변에만. 해가 드는 면(남·서)에 우선 배치합니다.'},
+{n:30,f:'Fa',name:'타공 패널',st:0,key:'Ø20 @50 · 13%',
+ b:g=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(2.76,2.6),M.perf);m.position.set(1.5,1.5,0);g.add(sh(m));
+   bar(g,[.1,.2,0],[2.9,.2,0],.04);bar(g,[.1,2.8,0],[2.9,2.8,0],.04);bar(g,[.1,.2,0],[.1,2.8,0],.04);bar(g,[2.9,.2,0],[2.9,2.8,0],.04);},
+ d:g=>{dim(g,[.12,.2,0],[2.88,.2,0],[0,-.6,0],'2,760');dim(g,[2.9,.2,0],[2.9,2.8,0],[.6,0,0],'2,600');},
+ spec:[['패널','2,760 × 2,600 × t3'],['타공','Ø20 @ 50'],['개구율','약 13%'],['재료','알루미늄']],
+ rule:'캡슐 칸의 바깥 변에. 밤에는 안의 빛이 점으로 새어 나와요.'},
+{n:31,f:'Fa',name:'천막',st:0,key:'처짐 200',
+ b:g=>{const geo=new THREE.PlaneGeometry(2.8,2.6,24,24),p=geo.attributes.position;
+   for(let i=0;i<p.count;i++){const u=(p.getX(i)+1.4)/2.8,v=(1.3-p.getY(i))/2.6;p.setZ(i,.2*Math.sin(PI*u)*Math.sin(PI*v*.9));}
+   geo.computeVertexNormals();const m=new THREE.Mesh(geo,M.cloth);m.position.set(1.5,1.5,0);g.add(m);bar(g,[.1,2.8,0],[2.9,2.8,0],.05);},
+ d:g=>{dim(g,[.1,2.8,0],[2.9,2.8,0],[0,.5,0],'2,800');dim(g,[2.9,.2,0],[2.9,2.8,0],[.6,0,0],'2,600');},
+ spec:[['크기','2,800 × 2,600'],['처짐','최대 200'],['재료','PTFE 막 / 캔버스'],['고정','상부 봉 + 하부 끈']],
+ rule:'데크 칸의 바깥 변에. 가장 가볍고 교체가 쉬운 파사드예요.'},
+{n:32,f:'Fa',name:'유리',st:0,key:'t12 · 프레임 50',
+ b:g=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(2.9,2.5),M.glassF);m.position.set(1.5,1.5,0);g.add(m);
+   bar(g,[.05,.25,0],[2.95,.25,0],.05);bar(g,[.05,2.75,0],[2.95,2.75,0],.05);bar(g,[.05,.25,0],[.05,2.75,0],.05);bar(g,[2.95,.25,0],[2.95,2.75,0],.05);},
+ d:g=>{dim(g,[.05,.25,0],[2.95,.25,0],[0,-.6,0],'2,900');dim(g,[2.95,.25,0],[2.95,2.75,0],[.6,0,0],'2,500');},
+ spec:[['크기','2,900 × 2,500'],['유리','강화 t12'],['프레임','50 × 50'],['특징','실내화, 기후 차단']],
+ rule:'데크 칸을 실내로 만들 때. 유리 4면이 되면 그 칸은 방이 됩니다.'},
+{n:33,f:'Fa',name:'발',st:0,key:'Ø20 @30',
+ b:g=>{for(let y=.2;y<=2.8;y+=.03)B(g,2.8,.02,.02,1.5,y,0,M.facade);bar(g,[.1,2.85,0],[2.9,2.85,0],.04);},
+ d:g=>{dim(g,[.1,.2,0],[2.9,.2,0],[0,-.6,0],'2,800');dim(g,[2.9,.2,0],[2.9,2.8,0],[.6,0,0],'2,600');},
+ spec:[['크기','2,800 × 2,600'],['살','대나무 Ø20 @ 30'],['개폐','말아 올림'],['특징','시선 반투과']],
+ rule:'데크·캡슐 칸 모두 가능. 사람이 직접 올리고 내리는 유일한 원소예요.'},
+{n:34,f:'Fa',name:'그물',st:0,key:'격자 200',
+ b:g=>{for(let i=0;i<15;i++)bar(g,[.1+i*.2,.2,0],[.1+i*.2,2.8,0],.012,M.facade);for(let j=0;j<14;j++)bar(g,[.1,.2+j*.2,0],[2.9,.2+j*.2,0],.012,M.facade);
+   bar(g,[.1,.2,0],[2.9,.2,0],.05);bar(g,[.1,2.8,0],[2.9,2.8,0],.05);bar(g,[.1,.2,0],[.1,2.8,0],.05);bar(g,[2.9,.2,0],[2.9,2.8,0],.05);},
+ d:g=>{dim(g,[.1,.2,0],[2.9,.2,0],[0,-.6,0],'2,800');dim(g,[2.9,.2,0],[2.9,2.8,0],[.6,0,0],'2,600');dim(g,[.1,2.8,0],[.3,2.8,0],[0,.5,0],'200');},
+ spec:[['크기','2,800 × 2,600'],['격자','200 × 200'],['로프','Ø10'],['특징','추락 방지, 덩굴 지지']],
+ rule:'2층 이상 데크의 바깥 변에 우선. 덩굴(37)이 타고 올라갈 수 있어요.'},
+/* Green */
+{n:35,f:'Gr',name:'플랜터',st:1,key:'900×420×380',
+ b:g=>{B(g,.9,.38,.42,0,.19,0,M.pot);shrub(g,-.28,.52,0,.24);shrub(g,0,.58,0,.3);shrub(g,.28,.5,0,.22);},
+ d:g=>{dim(g,[-.45,0,.21],[.45,0,.21],[0,0,.5],'900');dim(g,[.45,0,.21],[.45,.38,.21],[.5,0,0],'380');dim(g,[.45,0,-.21],[.45,0,.21],[.5,0,-.0001],'420');},
+ spec:[['크기','900 × 420 × 380'],['토심','300'],['재료','목재 / FRP'],['무게','젖은 흙 약 120 kg']],
+ rule:'2층 이상 데크(13·14) 위에만. 한 칸에 최대 2개.'},
+{n:36,f:'Gr',name:'나무',st:0,key:'H 3,500 · Ø2,000',
+ b:g=>{const t=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,2.0,8),M.pot);t.position.set(0,1.0,0);g.add(sh(t));
+   const c=new THREE.Mesh(new THREE.IcosahedronGeometry(1.0,1),M.leaf);c.position.set(0,2.6,0);c.scale.y=.9;g.add(sh(c));},
+ d:g=>{dim(g,[-1,0,0],[-1,3.5,0],[-.6,0,0],'3,500');dim(g,[-1,2.6,1.05],[1,2.6,1.05],[0,0,.5],'Ø2,000');},
+ spec:[['수고','3,500'],['수관 폭','Ø2,000'],['줄기','Ø200'],['위치','1층 비움 칸 / 대지']],
+ rule:'1층 비움(21)이나 중정(22), 대지에만. 위 칸이 비어 있어야 해요.'},
+{n:37,f:'Gr',name:'덩굴',st:0,key:'H 3,000 · 와이어 @300',
+ b:g=>{bar(g,[0,0,0],[0,3,0],T);const r=mkRng(37);bar(g,[.22,0,0],[.22,3,0],.006,M.pot);bar(g,[-.22,0,0],[-.22,3,0],.006,M.pot);
+   for(let i=0;i<26;i++){const y=.2+r()*2.8,a=r()*PI*2,rr=.15+r()*.15;shrub(g,Math.cos(a)*rr,y,Math.sin(a)*rr,.08+r()*.1);}},
+ d:g=>{dim(g,[0,0,.4],[0,3,.4],[-.7,0,0],'3,000');},
+ spec:[['높이','기둥 3,000'],['와이어','Ø4 @ 300'],['피복','2~3년 후 완성'],['종류','담쟁이·으아리']],
+ rule:'뼈대 기둥이나 그물(34) 옆에만. 사람이 아니라 시간이 채우는 원소예요.'},
+{n:38,f:'Gr',name:'옥상 잔디',st:0,key:'토심 200 · 총 300',
+ b:g=>{B(g,3,.1,3,1.5,.05,1.5,M.pot);B(g,3,.18,3,1.5,.19,1.5,M.soil);B(g,3,.02,3,1.5,.29,1.5,M.leaf);},
+ d:g=>{dim(g,[0,0,3],[0,.3,3],[-.7,0,0],'300');dim(g,[0,0,3],[3,0,3],[0,0,.7],'3,000');},
+ spec:[['크기','3,000 × 3,000'],['층 구성','배수 100 + 토양 180 + 잔디 20'],['하중','약 300 kg/m²'],['아래','슬래브(14) 필수']],
+ rule:'가장 높은 칸 위, 슬래브(14)가 있을 때만. 지붕 위 캡슐(12)과 같은 칸에 놓일 수 없어요.'}
+];
+
+/* ---------- table UI ---------- */
+const famOf=id=>FAMS.find(f=>f.id===id);
+const ptable=document.getElementById('ptable');
+FAMS.forEach((f,ci)=>{
+  const h=document.createElement('div'); h.className='colhead'; h.style.setProperty('--famc','var('+f.c+')');
+  h.style.gridColumn=ci+1; h.style.gridRow=1;
+  const list=E.filter(e=>e.f===f.id);
+  h.innerHTML=f.name+'<span>'+list[0].n+'–'+list[list.length-1].n+'</span>';
+  ptable.appendChild(h);
+  list.forEach((e,ri)=>{
+    const b=document.createElement('button'); b.className='tile'+(e.st?'':' later'); b.id='el-'+e.n;
+    b.style.setProperty('--famc','var('+f.c+')'); b.style.gridColumn=ci+1; b.style.gridRow=ri+2;
+    b.setAttribute('aria-pressed','false');
+    b.innerHTML='<span class="n">'+e.n+'</span><span class="st">'+(e.st?'1차':'발견 예정')+'</span><img alt="'+e.name+' 3D 미리보기" id="th-'+e.n+'"><span class="nm">'+e.name+'</span><span class="kd">'+e.key+'</span>';
+    b.addEventListener('click',()=>select(e.n));
+    ptable.appendChild(b);
+  });
+});
+
+/* ---------- three: shared ---------- */
+function lights(scene){
+  scene.add(new THREE.HemisphereLight(0xffffff,0x888888,.7));
+  const d=new THREE.DirectionalLight(0xffffff,.7); d.position.set(8,14,10); scene.add(d); return d;
+}
+function disposeGroup(g){
+  g.traverse(o=>{ if(o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); if(o.isSprite) o.material.dispose(); });
+}
+function fit(cam,box,dirv,margin){
+  const c=box.getCenter(new THREE.Vector3()),s=box.getSize(new THREE.Vector3());
+  const r=Math.max(s.x,s.y,s.z,1)*.5*Math.sqrt(2);
+  const fov=cam.fov*PI/180, dist=r/Math.sin(fov/2)*margin/Math.min(1,cam.aspect);
+  cam.position.copy(c).addScaledVector(dirv.clone().normalize(),dist); cam.near=dist/50; cam.far=dist*10;
+  cam.lookAt(c); cam.updateProjectionMatrix(); return c;
+}
+const VIEW=new THREE.Vector3(1,.75,1.25);
+
+/* thumbnails */
+const tR=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,alpha:true});
+const TW=250,TH=200; tR.setPixelRatio(1); tR.setSize(TW,TH);
+const tScene=new THREE.Scene(); lights(tScene);
+const tCam=new THREE.PerspectiveCamera(30,TW/TH,.1,200);
+function renderThumbs(){
+  E.forEach(e=>{
+    const g=new THREE.Group(); e.b(g); tScene.add(g);
+    fit(tCam,new THREE.Box3().setFromObject(g),VIEW,1.05);
+    tR.setClearColor(0x000000,0); tR.render(tScene,tCam);
+    document.getElementById('th-'+e.n).src=tR.domElement.toDataURL('image/png');
+    tScene.remove(g); disposeGroup(g);
+  });
+}
+
+/* main viewer */
+const vp=document.getElementById('vp'),cv=document.getElementById('cv');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2)); R.shadowMap.enabled=true; R.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene(); const sun=lights(scene);
+sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.bias=-.0004;
+Object.assign(sun.shadow.camera,{left:-10,right:10,top:10,bottom:-10,near:1,far:60});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200),M.ground); ground.rotation.x=-PI/2; ground.position.y=-.002; ground.receiveShadow=true; scene.add(ground);
+const cam=new THREE.PerspectiveCamera(32,1,.1,500);
+const ctl=new THREE.OrbitControls(cam,cv); ctl.enableDamping=true; ctl.maxPolarAngle=PI*.495;
+let group=null,dimGroup=null,current=5;
+const dimToggle=document.getElementById('dimtoggle');
+dimToggle.addEventListener('change',()=>{ if(dimGroup) dimGroup.visible=dimToggle.checked; });
+
+function buildMain(n,refit){
+  const e=E.find(x=>x.n===n);
+  if(group){scene.remove(group);disposeGroup(group);}
+  labelTex.splice(0).forEach(t=>t.dispose());
+  group=new THREE.Group(); e.b(group);
+  const box=new THREE.Box3().setFromObject(group);
+  dimGroup=new THREE.Group(); e.d(dimGroup); dimGroup.visible=dimToggle.checked; group.add(dimGroup);
+  scene.add(group);
+  if(refit){
+    const big=box.clone().union(new THREE.Box3().setFromObject(dimGroup));
+    const c=fit(cam,big,VIEW,1.08); ctl.target.copy(c); ctl.update();
+    sun.target.position.copy(c); scene.add(sun.target); sun.position.copy(c).add(new THREE.Vector3(8,14,10));
+  }
+}
+function card(e){
+  const f=famOf(e.f),el=document.getElementById('card');
+  el.style.setProperty('--famc','var('+f.c+')');
+  el.innerHTML='<div class="cardhead"><div class="bignum">'+e.n+'</div><div><h2>'+e.name+'</h2><div class="chips"><span class="chip fam">'+f.name+'</span><span class="chip">'+(e.st?'1차 실험':'발견 예정')+'</span></div></div></div>'+
+    '<dl>'+e.spec.map(s=>'<dt>'+s[0]+'</dt><dd>'+s[1]+'</dd>').join('')+'</dl>'+
+    '<div class="unit">단위 mm · 기준 칸 3,000</div>'+
+    '<div class="rule"><h3>결합 규칙</h3><p>'+e.rule+'</p></div>';
+}
+function select(n){
+  document.querySelectorAll('.tile').forEach(t=>t.setAttribute('aria-pressed',t.id==='el-'+n?'true':'false'));
+  current=n; buildMain(n,true); card(E.find(x=>x.n===n));
+}
+function resize(){
+  const w=vp.clientWidth,h=vp.clientHeight; if(!w||!h) return;
+  R.setSize(w,h,false); cam.aspect=w/h; cam.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(vp);
+
+function applyTheme(){
+  applyColors();
+  scene.background=new THREE.Color(tok('--panel'));
+  renderThumbs(); buildMain(current,false);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+function start(){
+  applyColors(); scene.background=new THREE.Color(tok('--panel'));
+  resize(); renderThumbs(); select(5);
+  (function loop(){requestAnimationFrame(loop);ctl.update();R.render(scene,cam);})();
+}
+const fontsReady=document.fonts&&document.fonts.ready?Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,1500))]):Promise.resolve();
+fontsReady.then(start);
+})();
+</script>
+
+</body>
+</html>

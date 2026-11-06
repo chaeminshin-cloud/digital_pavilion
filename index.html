@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="원소를 발견하거나 골라 결합 규칙대로 3D 파빌리온을 조합하는 시뮬레이터">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%224%22 y=%224%22 width=%2224%22 height=%2224%22 fill=%22none%22 stroke=%22%231c2125%22 stroke-width=%223%22/%3E%3Crect x=%2210%22 y=%2213%22 width=%2214%22 height=%229%22 rx=%223%22 fill=%22%232d55c6%22/%3E%3C/svg%3E">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}a.navlink{display:inline-block;margin-top:8px;font-size:13px;color:var(--capsule);text-decoration:none;font-weight:500}a.navlink:hover{text-decoration:underline}</style>
+<title>파빌리온 조합기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: drafting-table split — live 3D pavilion left, mode / element tray / result log right (stacks on phones) */
+:root{
+  --bg:#eceeea; --panel:#f7f8f5; --ink:#1c2125; --muted:#5f686d; --line:#d2d7d2; --soft:#e3e6e1;
+  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499;
+  --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 404px;height:100%}
+.viewport{position:relative;min-width:0;min-height:0}
+.viewport canvas{display:block;width:100%;height:100%;touch-action:none}
+.ov{position:absolute;display:flex;gap:6px;flex-wrap:wrap}
+.ov-top{top:calc(12px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:12px;justify-content:space-between;align-items:flex-start}
+.ov-bot{bottom:12px;left:max(12px,env(safe-area-inset-left,0px));right:12px}
+.pill{background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:12px var(--mono);color:var(--muted)}
+.ghostbtn{font:500 12px var(--sans);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:6px 10px;cursor:pointer}
+.legend{display:flex;gap:12px;flex-wrap:wrap;background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+
+.panel{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;padding-block:20px 28px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:22px;font-weight:700;margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:12px;font-weight:700;margin:0 0 8px;letter-spacing:.04em;color:var(--muted)}
+.sub{color:var(--muted);margin:6px 0 0;line-height:1.55;font-size:13px}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--bg)}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);font:500 13px var(--sans);padding:8px 10px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.seg.small button{font:500 12px var(--mono);padding:6px 8px}
+.row{display:flex;gap:8px;align-items:center}
+.btn{font:700 14px var(--sans);padding:11px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--ink);color:var(--panel);cursor:pointer;width:100%}
+.btn:active{transform:translateY(1px)}
+.btn2{font:500 12px var(--sans);padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;white-space:nowrap}
+.stack{display:flex;flex-direction:column;gap:10px}
+input[type=text]{flex:1;min-width:0;font:13px var(--mono);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+:focus-visible{outline:2px solid var(--capsule);outline-offset:2px}
+
+.mini{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.mini .ch{font:500 10.5px var(--sans);color:var(--muted);border-bottom:2px solid var(--famc);padding-bottom:3px;text-align:center;white-space:nowrap;overflow:hidden}
+.mt{border:1px solid var(--line);border-top:3px solid var(--famc);border-radius:3px;background:var(--bg);color:var(--ink);padding:3px 2px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;font:inherit}
+.mt b{font:500 13px var(--mono)}
+.mt span{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mt[aria-pressed="false"]{opacity:.38;border-style:dashed;border-top-color:var(--line)}
+
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.stats div{background:var(--panel);padding:8px 4px;text-align:center}
+.stats b{display:block;font:500 17px var(--mono);font-variant-numeric:tabular-nums}
+.stats span{font-size:11px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:inline-flex;align-items:baseline;gap:5px;border:1px solid var(--line);border-left:3px solid var(--famc);border-radius:4px;padding:4px 7px;font-size:12px;background:var(--bg)}
+.chip b{font:500 12px var(--mono);color:var(--famc)}
+.chip em{font:normal 11px var(--mono);color:var(--muted)}
+.chip.auto{border-style:dashed;border-left-style:solid}
+.chip.unused{opacity:.45}
+.tagauto{font-size:10px;color:var(--panel);background:var(--muted);border-radius:3px;padding:0 4px}
+.log{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;font-size:12.5px;line-height:1.5;color:var(--ink)}
+.log li{padding-left:12px;position:relative}
+.log li::before{content:"";position:absolute;left:0;top:.6em;width:5px;height:5px;border-radius:50%;background:var(--muted)}
+.log li.warn::before{background:var(--deck)}
+.log li.ok::before{background:var(--green)}
+details{border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.rules{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.rule{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px}
+.rule label{font-size:13px}
+.rule input{grid-column:1/-1;width:100%;accent-color:var(--ink)}
+.rule output{font:12px var(--mono);color:var(--muted)}
+[hidden]{display:none!important}
+
+@media (max-width:820px){
+  html,body{height:auto}
+  .app{grid-template-columns:1fr;grid-template-rows:58vh auto;height:auto}
+  .panel{border-left:0;border-top:1px solid var(--line);overflow:visible}
+}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <div class="viewport" id="vp">
+    <canvas id="cv" aria-label="조합된 파빌리온 3D 모델"></canvas>
+    <div class="ov ov-top">
+      <div class="pill" id="frameinfo">틀 준비 중</div>
+      <button class="ghostbtn" id="resetview">시점 초기화</button>
+    </div>
+    <div class="ov ov-bot">
+      <div class="legend">
+        <span><i style="background:var(--ink)"></i>뼈대</span>
+        <span><i style="background:var(--capsule)"></i>끼우기</span>
+        <span><i style="background:var(--deck)"></i>채우기</span>
+        <span><i style="background:var(--stair)"></i>사선</span>
+        <span><i style="background:var(--facade)"></i>파사드</span>
+        <span><i style="background:var(--green)"></i>그린</span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <header>
+      <div class="eyebrow">그룹 2 · 조합 엔진 v0.1</div>
+      <h1>파빌리온 조합기</h1>
+      <p class="sub">원소를 발견하거나 직접 골라 결합 규칙대로 조합합니다. 빠진 원소는 엔진이 자동으로 보충하고 기록에 남겨요.</p>
+      <a class="navlink" href="elements.html">원소 주기율표 보기 →</a>
+    </header>
+
+    <section class="stack" id="discoverBox">
+      <h2>① 랜덤으로 발견하기 · 뽑을 원소 수</h2>
+      <div class="seg small" role="group" aria-label="뽑을 원소 수" id="drawSeg">
+        <button data-v="9" aria-pressed="true">9</button>
+        <button data-v="18" aria-pressed="false">18</button>
+        <button data-v="23" aria-pressed="false">23</button>
+        <button data-v="38" aria-pressed="false">38 전체</button>
+      </div>
+      <button class="btn" id="discoverBtn">원소 발견하기</button>
+    </section>
+
+    <section class="stack" id="pickBox">
+      <h2>② 직접 고르기 · 눌러서 켜고 끄면 바로 다시 조합돼요</h2>
+      <div class="mini" id="mini"></div>
+      <div class="row">
+        <button class="btn2" id="pickFirst">1차 원소만</button>
+        <button class="btn2" id="pickAll">전체</button>
+        <button class="btn2" id="pickNone">모두 끄기</button>
+      </div>
+    </section>
+
+    <section class="stack">
+      <div class="row">
+        <input type="text" id="seed" aria-label="시드" spellcheck="false">
+        <button class="btn2" id="reshuffle">같은 원소로 다시 배치</button>
+      </div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section>
+      <h2 id="usedTitle">사용된 원소</h2>
+      <div class="chips" id="used"></div>
+    </section>
+
+    <section>
+      <h2>엔진 기록</h2>
+      <ul class="log" id="log"></ul>
+    </section>
+
+    <details>
+      <summary>틀 크기 · 규칙 비중</summary>
+      <div class="rules">
+        <div class="seg small" role="group" aria-label="틀 크기" id="sizeSeg">
+          <button data-v="S" aria-pressed="true">작게</button>
+          <button data-v="M" aria-pressed="false">보통</button>
+          <button data-v="L" aria-pressed="false">크게</button>
+        </div>
+        <div id="rules"></div>
+      </div>
+    </details>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const PI=Math.PI,SQ3=Math.sqrt(3),S=3;
+
+/* ================= DATA ================= */
+const FAMS=[{id:'R1',name:'뼈대',c:'--ink'},{id:'R2',name:'끼우기',c:'--capsule'},{id:'R3f',name:'채우기',c:'--deck'},{id:'R3v',name:'비우기',c:'--void'},{id:'R4',name:'사선',c:'--stair'},{id:'Fa',name:'파사드',c:'--facade'},{id:'Gr',name:'그린',c:'--green'}];
+const EL=[
+[1,'R1','사각 프레임','사각',1],[2,'R1','육각 프레임','육각',1],[3,'R1','사각+육각 연결','연결',0],[4,'R1','엇쌓기 사각','엇쌓기',0],
+[5,'R2','캡슐 단층','단층',1],[6,'R2','캡슐 2단','2단',1],[7,'R2','돌출 캡슐','돌출',1],[8,'R2','두 칸 관통 캡슐','관통',0],[9,'R2','삼각 캡슐','삼각캡',0],[10,'R2','육각 포드','포드',0],[11,'R2','매달린 캡슐','매달림',0],[12,'R2','지붕 위 캡슐','지붕캡',0],
+[13,'R3f','목재 슬랫 데크','슬랫',1],[14,'R3f','슬래브','슬래브',1],[15,'R3f','그레이팅','그레이팅',0],[16,'R3f','반투명 바닥','반투명',0],[17,'R3f','반층 데크','반층',0],[18,'R3f','경사 데크','경사',0],[19,'R3f','마름모 데크','마름모',0],[20,'R3f','삼각 데크','삼각',0],
+[21,'R3v','비움','비움',1],[22,'R3v','중정','중정',0],[23,'R3v','필로티','필로티',0],
+[24,'R4','V자 계단','V계단',1],[25,'R4','직선 계단','직선',0],[26,'R4','나선 계단','나선',0],[27,'R4','경사로','경사로',0],[28,'R4','사다리','사다리',0],
+[29,'Fa','루버','루버',1],[30,'Fa','타공 패널','타공',0],[31,'Fa','천막','천막',0],[32,'Fa','유리','유리',0],[33,'Fa','발','발',0],[34,'Fa','그물','그물',0],
+[35,'Gr','플랜터','플랜터',1],[36,'Gr','나무','나무',0],[37,'Gr','덩굴','덩굴',0],[38,'Gr','옥상 잔디','잔디',0]
+].map(a=>({n:a[0],f:a[1],name:a[2],short:a[3],first:!!a[4]}));
+const byN={}; EL.forEach(e=>byN[e.n]=e);
+const famC=n=>'var('+FAMS.find(f=>f.id===byN[n].f).c+')';
+const SQ_ONLY=new Set([5,6,7,8,11,12,13,15,17,18,24,25,27]);
+const TRI_ONLY=new Set([9,10,19,20,22,26]);
+const FRAME_SHAPES={1:['sq'],2:['tri'],3:['sq','tri'],4:['sq']};
+const SHAPE_NAME={1:'사각',2:'육각',3:'사각+육각',4:'엇쌓기 사각'};
+const compat=(n,shapes)=>SQ_ONLY.has(n)?shapes.includes('sq'):TRI_ONLY.has(n)?shapes.includes('tri'):true;
+const DRAW={9:[1,2,2,1,1,1,1],18:[1,4,4,2,3,2,2],23:[1,5,6,2,3,3,3]};
+const SIZE_BY_DRAW={9:'S',18:'M',23:'L',38:'L'};
+const SIZES={S:{nx:4,nz:2,H:3,hex:2},M:{nx:5,nz:3,H:4,hex:3},L:{nx:6,nz:3,H:5,hex:4}};
+const RULES=[
+  {id:'fill',label:'채우기 (캡슐) 비중',v:40},{id:'deck',label:'데크 비중',v:32},{id:'empty',label:'비움 비중',v:22},{id:'stair',label:'사선 (계단) 비중',v:14},
+  {id:'insert',label:'끼우기 · 돌출 확률',v:55,pct:1},{id:'multi',label:'큰 원소 배치 확률',v:45,pct:1},{id:'facade',label:'파사드 확률',v:30,pct:1},{id:'green',label:'그린 확률',v:45,pct:1}
+];
+const rv={}; RULES.forEach(r=>rv[r.id]=r.v);
+
+/* ================= RNG ================= */
+function makeRng(str){
+  let h=1779033703^str.length;
+  for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19;}
+  let a=(h^h>>>16)>>>0;
+  return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+}
+const pick=(r,a)=>a[Math.floor(r()*a.length)];
+function shuffle(r,a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function weighted(r,o){let t=0;for(const k in o)t+=o[k];if(t<=0)return null;let x=r()*t;for(const k in o){x-=o[k];if(x<=0)return k;}return Object.keys(o).pop();}
+const newBase=()=>Math.random().toString(36).slice(2,8);
+
+/* ================= GEOMETRY UTIL ================= */
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]], add=(a,b)=>[a[0]+b[0],a[1]+b[1]], mul=(a,s)=>[a[0]*s,a[1]*s];
+const nrm=a=>{const l=Math.hypot(a[0],a[1])||1;return[a[0]/l,a[1]/l];};
+const cen=p=>[p.reduce((s,v)=>s+v[0],0)/p.length,p.reduce((s,v)=>s+v[1],0)/p.length];
+const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+const hexPts=(a,cx,cz)=>[0,1,2,3,4,5].map(k=>[cx+a*Math.cos(k*PI/3),cz+a*Math.sin(k*PI/3)]);
+function edgeOut(pts,k){
+  const a=pts[k],b=pts[(k+1)%pts.length],c=cen(pts);
+  let n=nrm([b[1]-a[1],-(b[0]-a[0])]); const m=sub(mul(add(a,b),.5),c);
+  if(n[0]*m[0]+n[1]*m[1]<0) n=mul(n,-1); return n;
+}
+const pk=p=>Math.round(p[0]*100)+','+Math.round(p[1]*100);
+const ekey=(a,b)=>{const x=pk(a),y=pk(b);return x<y?x+'|'+y:y+'|'+x;};
+function sqFrame(poly){
+  let e1=nrm(sub(poly[1],poly[0])),e2=nrm(sub(poly[3],poly[0]));
+  if(e2[0]*(-e1[1])+e2[1]*e1[0]<0){const t=e1;e1=e2;e2=t;}
+  return{p0:poly[0],th:Math.atan2(-e1[1],e1[0]),x:e1,z:e2};
+}
+
+/* ================= FRAME → CELL GRAPH ================= */
+function profileHeights(r,nx,maxH){
+  const prof=pick(r,['center','rise','random']),H=[];
+  for(let i=0;i<nx;i++){
+    const t=nx>1?i/(nx-1):0; let h;
+    if(prof==='center') h=Math.round(1+(maxH-1)*(1-Math.abs(t-.5)*2)*.9+r()*.6);
+    else if(prof==='rise') h=Math.round(1+(maxH-1)*t+r()*.5);
+    else h=1+Math.floor(r()*maxH);
+    if(r()<.2) h-=1; H.push(Math.max(1,Math.min(maxH,h)));
+  }
+  return H;
+}
+function makeCells(frame,sz,r){
+  const cells=[],cols=[],info={};
+  const addCol=(polyFn,shape,H,extra)=>{
+    const cid=cols.length; cols.push({H,shape,...extra});
+    for(let j=0;j<H;j++){const poly=polyFn(j);cells.push({id:cells.length,poly,shape,level:j,col:cid,c:cen(poly),...extra});}
+  };
+  if(frame===1||frame===4){
+    const nx=sz.nx,nz=sz.nz,Hrow=profileHeights(r,nx,sz.H);
+    for(let i=0;i<nx;i++)for(let k=0;k<nz;k++){
+      const H=Math.max(1,Hrow[i]-(k>0&&r()<.3?1:0));
+      addCol(j=>{const s=frame===4&&j%2?1.5:0,x=i*S+s,z=k*S;return[[x,z],[x+S,z],[x+S,z+S],[x,z+S]];},'sq',H,{});
+    }
+    info.text=(frame===1?'사각':'엇쌓기 사각')+' '+nx+'×'+nz+'칸';
+  } else {
+    const nHex=frame===2?Math.max(2,sz.hex+(r()<.5?0:-1)+(r()<.3?1:0)):(sz.hex>=4?2:1);
+    const D=S*SQ3,centers=[[0,0]],seen=new Set([pk([0,0])]);
+    let guard=0;
+    while(centers.length<nHex&&guard++<200){
+      const c=pick(r,centers),k=Math.floor(r()*6),a=(30+60*k)*PI/180,nc=[c[0]+D*Math.cos(a),c[1]+D*Math.sin(a)];
+      if(!seen.has(pk(nc))){seen.add(pk(nc));centers.push(nc);}
+    }
+    const foots=[];
+    centers.forEach((c,hi)=>{
+      const hexH=Math.min(sz.H,2+Math.floor(r()*(sz.H-1)));
+      const V=hexPts(S,c[0],c[1]);
+      for(let k=0;k<6;k++){
+        const poly=[c,V[k],V[(k+1)%6]],H=Math.max(1,hexH-(r()<.2?1:0));
+        foots.push(cen(poly)); addCol(()=>poly,'tri',H,{hex:hi,tk:k,hexC:c});
+      }
+    });
+    let nSq=0,nJ=0;
+    if(frame===3){
+      const ok=poly=>{const cc=cen(poly);return foots.every(f=>dist(f,cc)>1.6);};
+      centers.forEach((c)=>{
+        const V=hexPts(S,c[0],c[1]),ring={};
+        for(let k=0;k<6;k++){
+          const a=(30+60*k)*PI/180,nb=[c[0]+D*Math.cos(a),c[1]+D*Math.sin(a)];
+          if(seen.has(pk(nb))) continue;
+          if(r()>.6) continue;
+          const n=edgeOut(V,k),p=V[k],q=V[(k+1)%6];
+          const sq=[p,q,add(q,mul(n,S)),add(p,mul(n,S))];
+          if(!ok(sq)) continue;
+          const h=1+Math.floor(r()*Math.max(1,sz.H-1));
+          foots.push(cen(sq)); addCol(()=>sq,'sq',h,{}); nSq++; ring[k]={n,h};
+          if(r()<.4){const sq2=[add(p,mul(n,S)),add(q,mul(n,S)),add(q,mul(n,2*S)),add(p,mul(n,2*S))];
+            if(ok(sq2)){const h2=Math.max(1,h-(r()<.5?1:0));foots.push(cen(sq2));addCol(()=>sq2,'sq',h2,{});nSq++;}}
+        }
+        for(let k=0;k<6;k++){
+          const k2=(k+1)%6; if(!ring[k]||!ring[k2]) continue;
+          const v=V[k2],tri=[v,add(v,mul(ring[k].n,S)),add(v,mul(ring[k2].n,S))];
+          if(!ok(tri)) continue;
+          foots.push(cen(tri)); addCol(()=>tri,'tri',Math.min(ring[k].h,ring[k2].h),{joint:true}); nJ++;
+        }
+      });
+      info.text='사각+육각 · 육각 '+centers.length+' · 사각 '+nSq+' · 연결 '+nJ;
+    } else info.text='육각 '+centers.length+'개';
+    info.hexCount=centers.length;
+  }
+  /* neighbours, up/down */
+  const byLevel={},colLevel={};
+  cells.forEach(c=>{
+    c.nb=c.poly.map(()=>-1); c.up=-1; c.down=-1; c.occ=null; c.force=null;
+    colLevel[c.col+'|'+c.level]=c.id;
+    (byLevel[c.level]=byLevel[c.level]||{});
+    c.poly.forEach((p,k)=>{const key=ekey(p,c.poly[(k+1)%c.poly.length]);(byLevel[c.level][key]=byLevel[c.level][key]||[]).push([c.id,k]);});
+  });
+  Object.values(byLevel).forEach(m=>Object.values(m).forEach(list=>{
+    if(list.length===2){const[a,b]=list;cells[a[0]].nb[a[1]]=b[0];cells[b[0]].nb[b[1]]=a[0];}
+  }));
+  cells.forEach(c=>{const u=colLevel[c.col+'|'+(c.level+1)];if(u!==undefined){c.up=u;cells[u].down=c.id;}});
+  cells.forEach(c=>{c.outer=c.nb.map((v,k)=>v===-1?k:-1).filter(k=>k>=0); if(c.shape==='sq') c.fr=sqFrame(c.poly);});
+  return{cells,cols,info};
+}
+
+/* ================= ENGINE ================= */
+function generate(pool,frame,sizeKey,seed,notes){
+  const r=makeRng('layout|'+seed+'|'+frame+'|'+sizeKey+'|'+[...pool].join('.'));
+  const {cells,cols,info}=makeCells(frame,SIZES[sizeKey],r);
+  const shapes=FRAME_SHAPES[frame];
+  const counts={},auto=new Set(),P=[];
+  const has=n=>pool.has(n);
+  const use=(n,isAuto)=>{counts[n]=(counts[n]||0)+1; if(isAuto&&!pool.has(n)) auto.add(n);};
+  const tally={autoFloor:0,autoVoid:0,forcedFloor:0,multi:{},retry:0};
+  const free=id=>id>=0&&!cells[id].occ;
+  const occ=(id,o)=>{cells[id].occ=o;};
+
+  /* stage 2: multi-cell elements first */
+  const sqPairs=[],triPairs=[];
+  cells.forEach(c=>c.nb.forEach((b,k)=>{if(b>c.id&&cells[b].shape===c.shape&&!c.joint===!cells[b].joint)(c.shape==='sq'?sqPairs:triPairs).push([c.id,b]);}));
+  const hexGroups={};
+  cells.forEach(c=>{if(c.hex!==undefined&&!c.joint)(hexGroups[c.hex+'|'+c.level]=hexGroups[c.hex+'|'+c.level]||[]).push(c.id);});
+  const groups=Object.entries(hexGroups).filter(([k,v])=>v.length===6).map(([k,v])=>({hex:+k.split('|')[0],level:+k.split('|')[1],ids:v}));
+  const MULTI=[22,10,26,8,25,27,19].filter(n=>has(n)&&compat(n,shapes));
+  const placed=n=>{tally.multi[n]=(tally.multi[n]||0)+1;use(n);};
+  shuffle(r,MULTI).forEach(n=>{
+    let cnt=0; const max=n===22||n===26?1:2;
+    const tryP=()=>r()*100<rv.multi&&cnt<max;
+    if(n===8||n===25||n===27){
+      for(const [a,b] of shuffle(r,sqPairs)){
+        if(!tryP()) continue;
+        const A=cells[a],Bc=cells[b];
+        if(!free(a)||!free(b)) continue;
+        if(n===27&&A.level!==0) continue;
+        if(n===25&&!(free(A.up)&&free(Bc.up))) continue;
+        const cat=n===8?'capsule':n===25?'stair':'floor', o={n,cat,pair:[a,b],main:true};
+        occ(a,o); occ(b,{n,cat,pair:[a,b]});
+        if(n===25){[A.up,Bc.up].forEach(u=>cells[u].force='floor');}
+        placed(n); cnt++;
+      }
+    } else if(n===19){
+      for(const [a,b] of shuffle(r,triPairs)){
+        if(!tryP()||!free(a)||!free(b)) continue;
+        occ(a,{n,cat:'floor',pair:[a,b],main:true}); occ(b,{n,cat:'floor',pair:[a,b]}); placed(n); cnt++;
+      }
+    } else {
+      for(const g of shuffle(r,groups)){
+        if(!tryP()||!g.ids.every(free)) continue;
+        if(n===22){
+          if(g.level!==0) continue;
+          const column=cells.filter(c=>c.hex===g.hex&&!c.joint);
+          if(!column.every(c=>!c.occ)) continue;
+          column.forEach((c,i)=>occ(c.id,{n,cat:'void',court:true,main:i===0&&c.level===0,hexC:c.hexC}));
+          placed(n); cnt++;
+        } else if(n===10){
+          g.ids.forEach((id,i)=>occ(id,{n,cat:'capsule',group:g,main:i===0})); placed(n); cnt++;
+        } else if(n===26){
+          const ups=g.ids.map(id=>cells[id].up);
+          if(!ups.every(u=>u>=0&&free(u))) continue;
+          g.ids.forEach((id,i)=>occ(id,{n,cat:'stair',group:g,main:i===0}));
+          ups.forEach(u=>{const c=cells[u]; if(c.tk===0||c.tk===1) occ(u,{n:0,cat:'open'}); else c.force='floor';});
+          placed(n); cnt++;
+        }
+      }
+    }
+  });
+
+  /* stage 3: single cells, bottom-up */
+  const floorOpts=c=>{
+    const base=c.shape==='sq'?[13,14,15,16,17,18]:[14,16,20];
+    return base.filter(n=>has(n)&&!(n===16&&[c.down,c.up].some(i=>i>=0&&cells[i].occ&&cells[i].occ.cat==='capsule')));
+  };
+  const capOpts=c=>{
+    let o=(c.shape==='sq'?[5,6,7,11]:[9]).filter(has);
+    if([c.down,c.up].some(i=>i>=0&&cells[i].occ&&cells[i].occ.n===16)) return [];
+    if(!c.outer.length) o=o.filter(n=>n!==7);
+    return o;
+  };
+  const voidOpts=c=>{const o=[];if(has(21))o.push(21);if(has(23)&&c.level===0&&c.up>=0&&(!cells[c.up].occ||cells[c.up].occ.cat!=='void'))o.push(23);return o;};
+  const stairOpts=c=>{if(!(c.up>=0&&free(c.up)))return[];return(c.shape==='sq'?[24,28]:[28]).filter(has);};
+  const setFloor=(c,why)=>{
+    const o=floorOpts(c); let n;
+    if(o.length) n=pick(r,o); else {n=14; tally.autoFloor++;}
+    occ(c.id,{n,cat:'floor'}); use(n,!o.length); if(why) tally.forcedFloor++;
+  };
+  const order=shuffle(r,cells).sort((a,b)=>a.level-b.level);
+  order.forEach(c=>{
+    if(c.occ) return;
+    if(c.force==='floor'){setFloor(c,true);return;}
+    let done=false;
+    for(let attempt=0;attempt<3&&!done;attempt++){
+      const opts={capsule:capOpts(c),floor:floorOpts(c),void:c.force==='nonvoid'?[]:voidOpts(c),stair:stairOpts(c)};
+      const cat=weighted(r,{capsule:opts.capsule.length?rv.fill:0,floor:opts.floor.length?rv.deck:0,void:opts.void.length?rv.empty:0,stair:opts.stair.length?rv.stair:0});
+      if(!cat) break;
+      let n;
+      if(cat==='capsule'){
+        const o=opts.capsule;
+        if(o.includes(7)&&o.length>1) n=r()*100<rv.insert?7:pick(r,o.filter(x=>x!==7)); else n=pick(r,o);
+        const ob={n,cat};
+        if((n===7)||(n===9&&c.outer.length&&r()*100<rv.insert)) ob.out=pick(r,c.outer);
+        occ(c.id,ob); use(n);
+      } else if(cat==='floor'){ n=pick(r,opts.floor); occ(c.id,{n,cat}); use(n); }
+      else if(cat==='void'){ n=pick(r,opts.void); occ(c.id,{n,cat}); use(n); if(n===23) cells[c.up].force='nonvoid'; }
+      else { n=pick(r,opts.stair); occ(c.id,{n,cat}); use(n); cells[c.up].force='floor'; }
+      done=true;
+      if(attempt>0) tally.retry++;
+    }
+    if(!done){
+      if(c.force==='nonvoid'){setFloor(c,true);return;}
+      occ(c.id,{n:21,cat:'void'}); use(21,true); tally.autoVoid++;
+    }
+  });
+
+  /* stage 5: roof, facade, green */
+  const tops={};
+  cells.forEach(c=>{if(!tops[c.col]||c.level>cells[tops[c.col]].level) tops[c.col]=c.id;});
+  const roof=[];
+  Object.values(tops).forEach(id=>{
+    const c=cells[id]; if(!c.occ||['void','open'].includes(c.occ.cat)) return;
+    if(has(12)&&c.shape==='sq'&&r()<.25){roof.push({n:12,id});use(12);return;}
+    if(has(38)&&r()*100<rv.green*.5){roof.push({n:38,id});use(38);use(14,true);}
+  });
+  const fac=[];
+  const facs=[29,30,31,32,33,34].filter(has);
+  if(facs.length) cells.forEach(c=>{
+    if(!c.occ) return;
+    if(!(c.occ.cat==='capsule'||(c.occ.cat==='floor'&&c.level>0))) return;
+    c.outer.forEach(k=>{ if(c.occ.out===k) return; if(r()*100<rv.facade){const n=pick(r,facs);fac.push({n,id:c.id,k});use(n);} });
+  });
+  const greens=[];
+  cells.forEach(c=>{
+    if(!c.occ) return;
+    if(has(35)&&c.occ.cat==='floor'&&c.level>0&&!c.occ.pair&&r()*100<rv.green){greens.push({n:35,id:c.id});use(35);}
+    if(has(36)&&c.occ.cat==='void'&&c.level===0&&!c.occ.court&&(c.up<0||cells[c.up].occ.cat==='void')&&c.occ.n===21&&r()*100<rv.green*.8){greens.push({n:36,id:c.id});use(36);}
+    if(has(36)&&c.occ.court&&c.occ.main){greens.push({n:36,at:c.occ.hexC});use(36);}
+  });
+  if(has(37)){
+    const vs={};
+    cells.forEach(c=>{if(c.level!==0)return;c.outer.forEach(k=>{[c.poly[k],c.poly[(k+1)%c.poly.length]].forEach(p=>{vs[pk(p)]={p,h:Math.max((vs[pk(p)]||{h:0}).h,cols[c.col].H)};});});});
+    Object.values(vs).forEach(v=>{if(r()*100<rv.green*.22){greens.push({n:37,p:v.p,h:v.h*S});use(37);}});
+  }
+
+  /* notes */
+  notes.push({t:'틀: '+info.text+' · 칸 '+cells.length+'개'});
+  const mk=Object.entries(tally.multi); if(mk.length) notes.push({t:'큰 원소 먼저 배치: '+mk.map(([n,c])=>n+' '+byN[n].name+' ×'+c).join(', '),c:'ok'});
+  if(tally.forcedFloor) notes.push({t:'계단 도착 바닥 '+tally.forcedFloor+'곳을 데크로 보정'});
+  if(tally.autoFloor) notes.push({t:'14 슬래브 자동 보충: 맞는 바닥 원소가 없어 계단 도착 바닥 '+tally.autoFloor+'곳에 사용',c:'warn'});
+  if(roof.some(x=>x.n===38)&&!has(14)) notes.push({t:'14 슬래브 자동 보충: 옥상 잔디 아래 받침',c:'warn'});
+  if(tally.autoVoid) notes.push({t:'21 비움 자동 보충: 규칙에 맞는 원소가 없는 칸 '+tally.autoVoid+'곳',c:'warn'});
+  if(tally.retry) notes.push({t:'결합 규칙 위반으로 다시 뽑은 칸 '+tally.retry+'곳'});
+  return {cells,cols,info,counts,auto,roof,fac,greens,frame};
+}
+
+/* ================= RENDER ================= */
+const M={
+  frame:new THREE.MeshStandardMaterial({roughness:.6,metalness:.1}),
+  capsule:new THREE.MeshStandardMaterial({roughness:.45}),
+  capLine:new THREE.LineBasicMaterial(),
+  deck:new THREE.MeshStandardMaterial({roughness:.85}),
+  deckGlass:new THREE.MeshStandardMaterial({roughness:.3,transparent:true,opacity:.4,depthWrite:false}),
+  stair:new THREE.MeshStandardMaterial({roughness:.7}),
+  facade:new THREE.MeshStandardMaterial({roughness:.7}),
+  perf:new THREE.MeshStandardMaterial({roughness:.7,side:THREE.DoubleSide,alphaTest:.5}),
+  cloth:new THREE.MeshStandardMaterial({roughness:.9,side:THREE.DoubleSide,transparent:true,opacity:.6,depthWrite:false}),
+  glassF:new THREE.MeshStandardMaterial({roughness:.1,side:THREE.DoubleSide,transparent:true,opacity:.22,depthWrite:false}),
+  leaf:new THREE.MeshStandardMaterial({roughness:.9,flatShading:true}),
+  pot:new THREE.MeshStandardMaterial({roughness:.9}),
+  soil:new THREE.MeshStandardMaterial({roughness:1}),
+  paving:new THREE.MeshStandardMaterial({roughness:1}),
+  ground:new THREE.MeshStandardMaterial({roughness:1})
+};
+(function(){const c=document.createElement('canvas');c.width=552;c.height=520;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,552,520);x.fillStyle='#000';
+  for(let i=5;i<552;i+=10)for(let j=5;j<520;j+=10){x.beginPath();x.arc(i,j,2.2,0,PI*2);x.fill();}M.perf.alphaMap=new THREE.CanvasTexture(c);})();
+const tok=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let grid=null;
+function applyColors(scene){
+  const c=n=>new THREE.Color(tok(n)),bg=c('--bg'),ink=c('--ink'),dark=bg.getHSL({}).l<.5;
+  scene.background=bg;
+  M.frame.color=ink; M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
+  M.deck.color=c('--deck'); M.deckGlass.color=c('--deck'); M.stair.color=c('--stair');
+  ['facade','perf','cloth','glassF'].forEach(k=>M[k].color=c('--facade'));
+  M.leaf.color=c('--green'); M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35); M.paving.color=c('--muted').lerp(bg,.5);
+  M.ground.color=bg.clone().lerp(ink,dark?.04:.05);
+  if(grid){scene.remove(grid);grid.geometry.dispose();}
+  grid=new THREE.GridHelper(150,50,c('--line'),c('--line')); grid.position.y=.004; scene.add(grid);
+}
+const UNIT=new THREE.BoxGeometry(1,1,1); UNIT.userData.shared=true;
+const UPV=new THREE.Vector3(0,1,0);
+let root;
+function sh(m){m.castShadow=!m.material.transparent;m.receiveShadow=true;return m;}
+function B(g,w,h,d,x,y,z,mat,rz,ry){const m=new THREE.Mesh(UNIT,mat);m.scale.set(w,h,d);m.position.set(x,y,z);if(rz)m.rotation.z=rz;if(ry)m.rotation.y=ry;g.add(sh(m));return m;}
+function bar(g,p,q,t,mat){const a=new THREE.Vector3(...p),b=new THREE.Vector3(...q),d=b.clone().sub(a),L=d.length();if(L<1e-4)return;
+  const m=new THREE.Mesh(UNIT,mat||M.frame);m.scale.set(t,L+t,t);m.position.copy(a).add(b).multiplyScalar(.5);m.quaternion.setFromUnitVectors(UPV,d.normalize());g.add(sh(m));}
+function polySlab(g,pts,y0,t,mat){const s=new THREE.Shape();pts.forEach((p,i)=>i?s.lineTo(p[0],-p[1]):s.moveTo(p[0],-p[1]));
+  const geo=new THREE.ExtrudeGeometry(s,{depth:t,bevelEnabled:false});geo.rotateX(-PI/2);geo.translate(0,y0,0);g.add(sh(new THREE.Mesh(geo,mat)));}
+function roundedPoly(pts,r){const n=pts.length,A=[],Bp=[];
+  for(let i=0;i<n;i++){const c=pts[i],v1=nrm(sub(pts[(i-1+n)%n],c)),v2=nrm(sub(pts[(i+1)%n],c));A[i]=add(c,mul(v1,r));Bp[i]=add(c,mul(v2,r));}
+  const s=new THREE.Shape();s.moveTo(A[0][0],A[0][1]);for(let i=0;i<n;i++){s.quadraticCurveTo(pts[i][0],pts[i][1],Bp[i][0],Bp[i][1]);const a=A[(i+1)%n];s.lineTo(a[0],a[1]);}return s;}
+function outline(g,geo,pos){const l=new THREE.LineSegments(new THREE.EdgesGeometry(geo,35),M.capLine);if(pos)l.position.copy(pos);g.add(l);}
+function capRect(g,w,h,d,cx,y0,cz){const b=.07,iw=w-2*b,ih=h-2*b,r=Math.min(iw,ih)*.28;
+  const geo=new THREE.ExtrudeGeometry(roundedPoly([[-iw/2,-ih/2],[iw/2,-ih/2],[iw/2,ih/2],[-iw/2,ih/2]],r),{depth:d-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:8});
+  geo.translate(0,0,-(d-2*b)/2);const m=new THREE.Mesh(geo,M.capsule);m.position.set(cx,y0+h/2,cz);g.add(sh(m));outline(g,geo,m.position);}
+function capPrism(g,pts,y0,h,r){const b=.07;
+  const geo=new THREE.ExtrudeGeometry(roundedPoly(pts.map(p=>[p[0],-p[1]]),r),{depth:h-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:8});
+  geo.rotateX(-PI/2);geo.translate(0,y0+b,0);g.add(sh(new THREE.Mesh(geo,M.capsule)));outline(g,geo);}
+function shrub(g,x,y,z,r){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(r,0),M.leaf);m.position.set(x,y,z);g.add(sh(m));}
+function local(p0,y0,th){const g=new THREE.Group();g.position.set(p0[0],y0,p0[1]);g.rotation.y=th;root.add(g);return g;}
+function vStair(g){const n=7,L=S*.62,rise=S/2/n,run=L/n,xs=S*.12,w=1.2,zA=S*.27,zB=S*.73;
+  for(let s=0;s<n;s++)B(g,run*1.02,.06,w,xs+run*(s+.5),rise*(s+1),zA,M.stair);
+  B(g,S*.2,.08,S*.86,xs+L+S*.1,S/2,S/2,M.stair);
+  for(let s=0;s<n;s++)B(g,run*1.02,.06,w,xs+L-run*(s+.5),S/2+rise*(s+1),zB,M.stair);
+  const len=Math.hypot(L,S/2),a=Math.atan2(S/2,L);B(g,len,.16,.05,xs+L/2,S/4,zA-w/2,M.stair,a);B(g,len,.16,.05,xs+L/2,S*.75,zB+w/2,M.stair,-a);}
+function ladder(g,x,z){bar(g,[x,0,z],[x,3,z],.035,M.stair);bar(g,[x+.45,0,z],[x+.45,3,z],.035,M.stair);for(let i=1;i<=9;i++)bar(g,[x,i*.3,z],[x+.45,i*.3,z],.03,M.stair);}
+function plant(g,x,y,z){B(g,.9,.38,.42,x,y+.19,z,M.pot);shrub(g,x-.28,y+.52,z,.24);shrub(g,x,y+.58,z,.3);shrub(g,x+.28,y+.5,z,.22);}
+function tree(g,x,z,r){const t=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,2,8),M.pot);t.position.set(x,1,z);g.add(sh(t));
+  const c=new THREE.Mesh(new THREE.IcosahedronGeometry(.85+r()*.3,1),M.leaf);c.position.set(x,2.55,z);c.scale.y=.9;g.add(sh(c));}
+const shrink=(pts,f)=>{const c=cen(pts);return pts.map(p=>add(c,mul(sub(p,c),f)));};
+
+function renderBody(c,res,r){
+  const o=c.occ; if(!o||o.n===0) return;
+  const y0=c.level*S;
+  if(o.pair){
+    if(!o.main) return;
+    const A=res.cells[o.pair[0]],Bc=res.cells[o.pair[1]];
+    if(o.n===19){
+      const sa=A.poly.map(pk),shared=Bc.poly.filter(p=>sa.includes(pk(p))),o1=A.poly.find(p=>!shared.some(s=>pk(s)===pk(p))),o2=Bc.poly.find(p=>!shared.some(s=>pk(s)===pk(p)));
+      polySlab(root,[o1,shared[0],o2,shared[1]],y0,.18,M.deck); return;
+    }
+    const dir=nrm(sub(Bc.c,A.c)),z=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(z,1.5));
+    const g=local(org,y0,Math.atan2(-dir[1],dir[0]));
+    if(o.n===8) capRect(g,5.4,2.0,2.34,3,.15,1.5);
+    else if(o.n===25){const n=14,rs=3/n,t=.28,x0=1.04;for(let s=0;s<n;s++)B(g,t,.05,1.0,x0+t*(s+.5),rs*(s+1),1.5,M.stair);
+      const L=Math.hypot(n*t,3),a=Math.atan2(3,n*t);B(g,L,.2,.05,x0+n*t/2,1.5,1.0,M.stair,a);B(g,L,.2,.05,x0+n*t/2,1.5,2.0,M.stair,a);}
+    else if(o.n===27){const a=Math.atan2(.5,6);B(g,Math.hypot(6,.5),.15,1.2,3,.325,1.5,M.stair,a);bar(g,[0,1.05,.9],[6,1.55,.9],.04,M.stair);bar(g,[0,1.05,2.1],[6,1.55,2.1],.04,M.stair);}
+    return;
+  }
+  if(o.group){
+    if(!o.main) return;
+    const hc=res.cells[o.group.ids[0]].hexC;
+    if(o.n===10) capPrism(root,hexPts(2.4,hc[0],hc[1]),y0+.15,2.4,.35);
+    if(o.n===26){bar(root,[hc[0],y0,hc[1]],[hc[0],y0+3,hc[1]],.2,M.stair);
+      for(let i=0;i<18;i++){const a=i*20*PI/180,m=B(root,1.4,.05,.36,hc[0]+.8*Math.cos(a),y0+(i+1)*3/18,hc[1]+.8*Math.sin(a),M.stair);m.rotation.y=-a;}}
+    return;
+  }
+  if(o.court){ if(o.main) polySlab(root,hexPts(S,o.hexC[0],o.hexC[1]),0,.04,M.paving); return; }
+  if(c.shape==='tri'){
+    if(o.n===9){let pts=shrink(c.poly,.73);if(o.out!==undefined){const n=edgeOut(c.poly,o.out);pts=pts.map(p=>add(p,mul(n,.9)));}capPrism(root,pts,y0+.15,2.0,.3);}
+    else if(o.n===14||o.n===20) polySlab(root,c.poly,y0,.18,M.deck);
+    else if(o.n===16) polySlab(root,c.poly,y0,.06,M.deckGlass);
+    else if(o.n===23) polySlab(root,c.poly,y0+2.82,.18,M.deck);
+    else if(o.n===28){const g=local(c.c,y0,r()*PI);ladder(g,-.22,0);}
+    return;
+  }
+  const f=c.fr,g=local(f.p0,y0,f.th);
+  switch(o.n){
+    case 5: case 7: {let ox=0,oz=0;if(o.out!==undefined){const n=edgeOut(c.poly,o.out);ox=(n[0]*f.x[0]+n[1]*f.x[1])*1.5;oz=(n[0]*f.z[0]+n[1]*f.z[1])*1.5;}capRect(g,2.4,2.0,2.34,1.5+ox,.15,1.5+oz);break;}
+    case 6: capRect(g,2.4,1.05,2.34,1.5,.15,1.5);capRect(g,2.4,1.05,2.34,1.5,1.3,1.5);break;
+    case 11: bar(g,[0,3,.7],[3,3,.7],.15);bar(g,[0,3,2.3],[3,3,2.3],.15);capRect(g,2.4,1.4,2.0,1.5,1.0,1.5);[[.6,.7],[2.4,.7],[.6,2.3],[2.4,2.3]].forEach(p=>bar(g,[p[0],2.35,p[1]],[p[0],3,p[1]],.03));break;
+    case 13: for(let s=0;s<8;s++)B(g,.29,.08,3,.1875+s*.375,.04,1.5,M.deck);break;
+    case 14: B(g,3,.18,3,1.5,.09,1.5,M.deck);break;
+    case 15: for(let s=0;s<=14;s++)B(g,.03,.07,3,s*3/14,.035,1.5,M.deck);B(g,3,.07,.04,1.5,.035,0,M.deck);B(g,3,.07,.04,1.5,.035,3,M.deck);break;
+    case 16: B(g,3,.06,3,1.5,.03,1.5,M.deckGlass);break;
+    case 17: B(g,3,.18,1.5,1.5,.09,2.25,M.deck);B(g,3,.18,1.5,1.5,1.59,.75,M.deck);break;
+    case 18: B(g,Math.hypot(3,.5),.18,3,1.5,.34,1.5,M.deck,Math.atan2(.5,3));break;
+    case 23: B(g,3,.18,3,1.5,2.91,1.5,M.deck);break;
+    case 24: vStair(g);break;
+    case 28: ladder(g,.3,.3);break;
+  }
+}
+function renderFacade(f,res){
+  const c=res.cells[f.id],p=c.poly[f.k],q=c.poly[(f.k+1)%c.poly.length],n=edgeOut(c.poly,f.k),L=dist(p,q),u=nrm(sub(q,p));
+  const y0=c.level*S,mid=add(mul(add(p,q),.5),mul(n,.12)),th=Math.atan2(n[0],n[1]);
+  const at=t=>add(add(p,mul(u,t)),mul(n,.12));
+  if(f.n===29){const cnt=Math.max(2,Math.round(L/.43));for(let i=0;i<cnt;i++){const a=at(L*(i+.5)/cnt);B(root,.04,2.6,.25,a[0],y0+1.5,a[1],M.facade,0,th);}}
+  else if(f.n===30||f.n===31||f.n===32){
+    const geo=new THREE.PlaneGeometry(L*.92,2.6,f.n===31?20:1,f.n===31?20:1);
+    if(f.n===31){const P=geo.attributes.position;for(let i=0;i<P.count;i++){const uu=P.getX(i)/(L*.92)+.5,vv=(1.3-P.getY(i))/2.6;P.setZ(i,.2*Math.sin(PI*uu)*Math.sin(PI*vv*.9));}geo.computeVertexNormals();}
+    const m=new THREE.Mesh(geo,f.n===30?M.perf:f.n===31?M.cloth:M.glassF);m.position.set(mid[0],y0+1.5,mid[1]);m.rotation.y=th;root.add(sh(m));
+    const a=at(L*.04),b=at(L*.96); bar(root,[a[0],y0+2.8,a[1]],[b[0],y0+2.8,b[1]],.04);
+    if(f.n!==31) bar(root,[a[0],y0+.2,a[1]],[b[0],y0+.2,b[1]],.04);
+  }
+  else if(f.n===33){for(let y=.2;y<=2.8;y+=.03)B(root,L*.93,.02,.02,mid[0],y0+y,mid[1],M.facade,0,th);}
+  else if(f.n===34){const nv=Math.max(2,Math.round(L/.2));for(let i=0;i<=nv;i++){const a=at(L*(.035+.93*i/nv));bar(root,[a[0],y0+.2,a[1]],[a[0],y0+2.8,a[1]],.012,M.facade);}
+    for(let j=0;j<=13;j++){const a=at(L*.035),b=at(L*.965);bar(root,[a[0],y0+.2+j*.2,a[1]],[b[0],y0+.2+j*.2,b[1]],.012,M.facade);}}
+}
+function renderAll(res,seedStr){
+  const r=makeRng('render|'+seedStr);
+  const seen=new Set();
+  res.cells.forEach(c=>{
+    const y0=c.level*S,n=c.poly.length;
+    const seg=(a,b)=>{const k=[a,b].map(v=>v.map(x=>Math.round(x*100)).join(',')).sort().join('|');if(seen.has(k))return;seen.add(k);bar(root,a,b,.15);};
+    for(let i=0;i<n;i++){const p=c.poly[i],q=c.poly[(i+1)%n];seg([p[0],y0,p[1]],[q[0],y0,q[1]]);seg([p[0],y0+S,p[1]],[q[0],y0+S,q[1]]);seg([p[0],y0,p[1]],[p[0],y0+S,p[1]]);}
+  });
+  res.cells.forEach(c=>renderBody(c,res,r));
+  res.roof.forEach(x=>{const c=res.cells[x.id],y=(c.level+1)*S;
+    if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);}
+    else{polySlab(root,c.poly,y,.18,M.deck);polySlab(root,shrink(c.poly,.97),y+.18,.1,M.pot);polySlab(root,shrink(c.poly,.97),y+.28,.16,M.soil);polySlab(root,shrink(c.poly,.97),y+.44,.03,M.leaf);}
+  });
+  res.fac.forEach(f=>renderFacade(f,res));
+  res.greens.forEach(x=>{
+    if(x.n===35){const c=res.cells[x.id],a=add(c.c,mul(sub(c.poly[0],c.c),.35));plant(root,a[0],c.level*S+.18,a[1]);}
+    else if(x.n===36){const p=x.at||res.cells[x.id].c;tree(root,p[0],p[1],r);}
+    else if(x.n===37){bar(root,[x.p[0],0,x.p[1]],[x.p[0],x.h,x.p[1]],.006,M.pot);const cnt=Math.round(x.h*6);for(let i=0;i<cnt;i++){const a=r()*PI*2,rr=.15+r()*.15;shrub(root,x.p[0]+Math.cos(a)*rr,.2+r()*(x.h-.2),x.p[1]+Math.sin(a)*rr,.07+r()*.09);}}
+  });
+}
+
+/* ================= THREE SETUP ================= */
+const vp=document.getElementById('vp'),cv=document.getElementById('cv');
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff,0x888888,.65));
+const sun=new THREE.DirectionalLight(0xffffff,.75);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0004;scene.add(sun);scene.add(sun.target);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),M.ground);ground.rotation.x=-PI/2;ground.position.y=-.002;ground.receiveShadow=true;scene.add(ground);
+const cam=new THREE.PerspectiveCamera(36,1,.1,600);
+const ctl=new THREE.OrbitControls(cam,cv);ctl.enableDamping=true;ctl.maxPolarAngle=PI*.495;
+let lastBox=null;
+function fitView(){
+  if(!lastBox) return;
+  const c=lastBox.getCenter(new THREE.Vector3()),s=lastBox.getSize(new THREE.Vector3());
+  const rad=Math.max(s.x,s.y,s.z)*.62+2,d=rad/Math.sin(cam.fov*PI/360)/Math.min(1,cam.aspect*.95);
+  cam.position.copy(c).add(new THREE.Vector3(.72,.5,.95).normalize().multiplyScalar(d));ctl.target.copy(c);ctl.update();
+}
+function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(vp);
+document.getElementById('resetview').addEventListener('click',fitView);
+
+/* ================= UI ================= */
+const ui={mode:'discover',draw:9,size:'S',pick:new Set(EL.filter(e=>e.first).map(e=>e.n))};
+const $=id=>document.getElementById(id);
+const seedEl=$('seed');
+function setPressed(container,val){container.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===String(val)?'true':'false'));}
+
+$('drawSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.draw=+b.dataset.v;setPressed($('drawSeg'),ui.draw);ui.size=SIZE_BY_DRAW[ui.draw];setPressed($('sizeSeg'),ui.size);});
+$('sizeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.size=b.dataset.v;setPressed($('sizeSeg'),ui.size);run();});
+$('discoverBtn').onclick=()=>{const base=newBase();seedEl.value=base+'/1';ui.pick=drawPool(base,ui.draw).pool;ui.discovered=ui.draw;syncMini();run();};
+$('reshuffle').onclick=()=>{const [b,v]=seedEl.value.split('/');seedEl.value=(b||newBase())+'/'+((+v||1)+1);run();};
+seedEl.addEventListener('change',run);
+
+const mini=$('mini');
+FAMS.forEach((f,ci)=>{const h=document.createElement('div');h.className='ch';h.textContent=f.name;h.style.setProperty('--famc','var('+f.c+')');h.style.gridColumn=ci+1;h.style.gridRow=1;mini.appendChild(h);
+  EL.filter(e=>e.f===f.id).forEach((e,ri)=>{const b=document.createElement('button');b.className='mt';b.id='mt-'+e.n;b.style.setProperty('--famc','var('+f.c+')');b.style.gridColumn=ci+1;b.style.gridRow=ri+2;
+    b.title=e.n+' '+e.name;b.innerHTML='<b>'+e.n+'</b><span>'+e.short+'</span>';
+    b.onclick=()=>{ui.pick.has(e.n)?ui.pick.delete(e.n):ui.pick.add(e.n);ui.discovered=0;syncMini();run();};mini.appendChild(b);});});
+function syncMini(){EL.forEach(e=>$('mt-'+e.n).setAttribute('aria-pressed',ui.pick.has(e.n)?'true':'false'));}
+$('pickFirst').onclick=()=>{ui.pick=new Set(EL.filter(e=>e.first).map(e=>e.n));ui.discovered=0;syncMini();run();};
+$('pickAll').onclick=()=>{ui.pick=new Set(EL.map(e=>e.n));ui.discovered=0;syncMini();run();};
+$('pickNone').onclick=()=>{ui.pick=new Set();ui.discovered=0;syncMini();run();};
+syncMini();
+
+const rulesEl=$('rules');
+RULES.forEach(rl=>{const d=document.createElement('div');d.className='rule';
+  d.innerHTML='<label for="r-'+rl.id+'">'+rl.label+'</label><output id="o-'+rl.id+'">'+rl.v+(rl.pct?'%':'')+'</output><input type="range" id="r-'+rl.id+'" min="0" max="100" value="'+rl.v+'">';
+  rulesEl.appendChild(d);const inp=d.querySelector('input'),out=d.querySelector('output');
+  inp.addEventListener('input',()=>{rv[rl.id]=+inp.value;out.textContent=inp.value+(rl.pct?'%':'');});
+  inp.addEventListener('change',run);});
+
+/* pool */
+function drawPool(base,count){
+  const r=makeRng('draw|'+base+'|'+count);
+  const frame=1+Math.floor(r()*4);
+  if(count===38) return{pool:new Set(EL.map(e=>e.n)),frame};
+  const shapes=FRAME_SHAPES[frame],pool=new Set([frame]);
+  FAMS.slice(1).forEach((f,i)=>{
+    const want=DRAW[count][i+1];
+    shuffle(r,EL.filter(e=>e.f===f.id&&compat(e.n,shapes)).map(e=>e.n)).slice(0,want).forEach(n=>pool.add(n));
+  });
+  return{pool,frame};
+}
+function pickPool(base,notes){
+  const pool=new Set(ui.pick),r=makeRng('frame|'+base);
+  const frames=[1,2,3,4].filter(n=>pool.has(n));let frame;
+  if(frames.length) frame=pick(r,frames);
+  else{
+    const wantTri=[...pool].some(n=>TRI_ONLY.has(n)),wantSq=[...pool].some(n=>SQ_ONLY.has(n));
+    frame=wantTri&&wantSq?3:wantTri?2:1;
+    notes.push({t:frame+' '+byN[frame].name+' 자동 보충: 뼈대를 고르지 않아 고른 원소에 맞는 틀을 넣음',c:'warn'});
+  }
+  const off=[...pool].filter(n=>n>4&&!compat(n,FRAME_SHAPES[frame]));
+  if(off.length) notes.push({t:'이번 틀('+SHAPE_NAME[frame]+')에서 못 쓰는 원소: '+off.join(', '),c:'warn'});
+  return{pool,frame,autoFrame:!frames.length};
+}
+
+/* run */
+function run(){
+  if(!seedEl.value) seedEl.value=newBase()+'/1';
+  const base=seedEl.value.split('/')[0];
+  const notes=[];
+  const {pool,frame,autoFrame}=pickPool(base,notes);
+  if(root){scene.remove(root);root.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();});}
+  root=new THREE.Group();scene.add(root);
+  const res=generate(pool,frame,ui.size,seedEl.value,notes);
+  res.counts[frame]=1; if(autoFrame) res.auto.add(frame);
+  renderAll(res,seedEl.value);
+  lastBox=new THREE.Box3().setFromObject(root);
+  const sz=lastBox.getSize(new THREE.Vector3()),c=lastBox.getCenter(new THREE.Vector3()),span=Math.max(sz.x,sz.z,sz.y);
+  sun.target.position.copy(c);sun.position.copy(c).add(new THREE.Vector3(span*.8,span*1.6,span*1.1));
+  Object.assign(sun.shadow.camera,{left:-span,right:span,top:span,bottom:-span,near:.5,far:span*5});sun.shadow.camera.updateProjectionMatrix();
+  fitView();
+  /* stats */
+  const cat={capsule:0,floor:0,void:0,stair:0};res.cells.forEach(x=>{if(x.occ&&cat[x.occ.cat]!==undefined)cat[x.occ.cat]++;});
+  $('stats').innerHTML=[['칸',res.cells.length],['채움',cat.capsule],['데크',cat.floor],['비움',cat.void],['계단',cat.stair]].map(([l,v])=>'<div><b>'+v+'</b><span>'+l+'</span></div>').join('');
+  $('frameinfo').textContent=frame+' '+byN[frame].name+' · '+res.info.text;
+  /* chips */
+  const all=new Set([...pool,...res.auto,...Object.keys(res.counts).map(Number)]);
+  const list=[...all].sort((a,b)=>a-b);
+  $('usedTitle').textContent=(ui.discovered?'발견한 원소 ':'선택한 원소 ')+pool.size+'개 · 배치 결과';
+  $('used').innerHTML=list.map(n=>{
+    const used=res.counts[n]>0,isAuto=res.auto.has(n);
+    const cnt=n<=4?(n===frame?'틀':''):(used?'×'+res.counts[n]:'미사용');
+    return '<span class="chip'+(isAuto?' auto':'')+(used?'':' unused')+'" style="--famc:'+famC(n)+'"><b>'+n+'</b>'+byN[n].name+' <em>'+cnt+'</em>'+(isAuto?'<span class="tagauto">자동</span>':'')+'</span>';
+  }).join('');
+  const unused=list.filter(n=>!res.counts[n]&&n>4);
+  if(unused.length) notes.push({t:'이번 배치에서 자리를 못 찾은 원소: '+unused.join(', ')+' (다시 배치하면 나올 수 있어요)'});
+  $('log').innerHTML=notes.map(x=>'<li class="'+(x.c||'')+'">'+x.t+'</li>').join('');
+}
+
+function themeChanged(){applyColors(scene);run();}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeChanged);
+new MutationObserver(themeChanged).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+applyColors(scene);resize();
+seedEl.value='group2/1';
+run();
+(function loop(){requestAnimationFrame(loop);ctl.update();R.render(scene,cam);})();
+})();
+</script>
+
+</body>
+</html>
