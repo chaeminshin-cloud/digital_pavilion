@@ -456,59 +456,167 @@ function generate(pool,frame,sizeKey,seed,notes){
     }
   });
 
-  /* stage 4a: stairs need a floor underneath (above ground) and an opening in the floor they arrive at */
-  const baseTally={n:0};
-  cells.forEach(c=>{
-    const o=c.occ; if(!o||o.cat!=='stair'||c.level===0) return;
-    const opts=(c.shape==='sq'?[14,13,15]:[14,20]).filter(has);
-    o.base=opts.length?pick(r,opts):14; use(o.base,!opts.length); baseTally.n++;
-  });
+  /* ---------- helpers for stage 4 ---------- */
+  const frameRot=(c,rot)=>{const th=c.fr.th+rot*PI/2;return{x:[Math.cos(th),-Math.sin(th)],z:[Math.sin(th),Math.cos(th)]};};
+  const toWorldR=(c,rot,l)=>{const f=frameRot(c,rot);return add(c.c,add(mul(f.x,l[0]-1.5),mul(f.z,l[1]-1.5)));};
   const toLocal=(cell,w)=>{const d=sub(w,cell.fr.p0);return[d[0]*cell.fr.x[0]+d[1]*cell.fr.x[1],d[0]*cell.fr.z[0]+d[1]*cell.fr.z[1]];};
-  const toWorld=(cell,l)=>add(cell.fr.p0,add(mul(cell.fr.x,l[0]),mul(cell.fr.z,l[1])));
+  const edgeToward=(c,v)=>{let best=-1,bd=.5;c.poly.forEach((p,k)=>{const n=edgeOut(c.poly,k),d=n[0]*v[0]+n[1]*v[1];if(d>bd){bd=d;best=k;}});return best;};
+  const rect=(x0,x1,z0,z1)=>[[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
   const addHole=(up,corners)=>{
     const u=cells[up]; if(!u||u.shape!=='sq'||!u.occ||u.occ.cat!=='floor'||u.occ.pair) return;
     const L=corners.map(w=>toLocal(u,w)),xs=L.map(p=>p[0]),zs=L.map(p=>p[1]);
     const h=[Math.max(0,Math.min(...xs)),Math.min(3,Math.max(...xs)),Math.max(0,Math.min(...zs)),Math.min(3,Math.max(...zs))];
     if(h[1]-h[0]>.05&&h[3]-h[2]>.05)(u.holes=u.holes||[]).push(h);
   };
-  const rect=(x0,x1,z0,z1)=>[[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
+  const walk=id=>id>=0&&!!cells[id].occ&&(['floor','stair'].includes(cells[id].occ.cat)||(cells[id].level===0&&cells[id].occ.cat==='void'));
+  /* which edges a stair can be entered from (null = any side) */
+  const entryOf=c=>{const o=c.occ;
+    if(o.n===24) return[edgeToward(c,mul(frameRot(c,o.rot||0).x,-1))];
+    if(o.n===25){if(o.pair[0]!==c.id) return[]; const B=cells[o.pair[1]]; return[edgeToward(c,mul(nrm(sub(B.c,c.c)),-1))];}
+    return null;
+  };
+  const entryScore=(c,k)=>{const b=k>=0?c.nb[k]:-1;
+    if(c.level===0) return(b<0||(cells[b].occ&&!['capsule','stair'].includes(cells[b].occ.cat)))?3:0;
+    if(b>=0&&cells[b].occ&&cells[b].occ.cat==='floor') return 3;
+    if(b>=0&&cells[b].occ&&cells[b].occ.n===21) return 2;
+    return 0;};
+  const toDeck=id=>{counts[21]--;cells[id].occ=null;setFloor(cells[id],true);tally.forcedFloor--;};
+  const dropStair=c=>{const o=c.occ;counts[o.n]--;if(o.base)counts[o.base]--;c.occ=null;setFloor(c,true);tally.forcedFloor--;};
+
+  /* stage 4a: stairs above ground stand on a floor */
+  const baseTally={n:0};
+  const giveBase=c=>{const o=c.occ;if(c.level===0||o.base)return;const opts=(c.shape==='sq'?[14,13,15]:[14,20]).filter(has);o.base=opts.length?pick(r,opts):14;use(o.base,!opts.length);baseTally.n++;};
+  cells.forEach(c=>{if(c.occ&&c.occ.cat==='stair')giveBase(c);});
+
+  /* stage 4b: stair entrance must open onto somewhere you can stand */
+  const stairFix={rot:0,deck:0,drop:0};
   cells.forEach(c=>{
-    const o=c.occ; if(!o||o.cat!=='stair') return;
-    if(o.n===24) addHole(c.up,rect(.36,2.22,1.59,2.79).map(l=>toWorld(c,l)));
-    else if(o.n===28&&c.shape==='sq') addHole(c.up,rect(.2,.85,.12,.62).map(l=>toWorld(c,l)));
-    else if(o.n===25&&o.main){
-      const A=cells[o.pair[0]],Bc=cells[o.pair[1]],dir=nrm(sub(Bc.c,A.c)),zv=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(zv,1.5));
+    const o=c.occ;if(!o||o.cat!=='stair')return;
+    if(o.n===24){
+      let best=-1,bs=0;
+      shuffle(r,[0,1,2,3]).forEach(rot=>{const k=edgeToward(c,mul(frameRot(c,rot).x,-1)),sc=entryScore(c,k);if(sc>bs){bs=sc;best=rot;}});
+      if(!bs){dropStair(c);stairFix.drop++;return;}
+      o.rot=best; if(best) stairFix.rot++;
+      if(bs===2){toDeck(c.nb[edgeToward(c,mul(frameRot(c,best).x,-1))]);stairFix.deck++;}
+    } else if(o.n===25&&o.main){
+      const [a,b2]=o.pair,A=cells[a],Bc=cells[b2];
+      const k1=edgeToward(A,mul(nrm(sub(Bc.c,A.c)),-1)),k2=edgeToward(Bc,mul(nrm(sub(A.c,Bc.c)),-1));
+      const s1=entryScore(A,k1),s2=entryScore(Bc,k2),flip=s2>s1,sc=flip?s2:s1;
+      if(!sc){[A,Bc].forEach(dropStair);stairFix.drop++;return;}
+      if(flip){A.occ.pair.reverse();Bc.occ.pair.reverse();stairFix.rot++;}
+      if(sc===2){const E=flip?Bc:A,k=flip?k2:k1;toDeck(E.nb[k]);stairFix.deck++;}
+    }
+  });
+  /* openings in the floor a stair arrives at */
+  const stairHoles=c=>{const o=c.occ;
+    if(o.n===24) addHole(c.up,rect(.36,2.22,1.59,2.79).map(l=>toWorldR(c,o.rot||0,l)));
+    else if(o.n===28&&c.shape==='sq') addHole(c.up,rect(.2,.85,.12,.62).map(l=>toWorldR(c,0,l)));
+    else if(o.n===25&&o.pair[0]===c.id){
+      const A=c,Bc=cells[o.pair[1]],dir=nrm(sub(Bc.c,A.c)),zv=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(zv,1.5));
       const w=rect(1.04,4.96,1.0,2.0).map(l=>add(org,add(mul(dir,l[0]),mul(zv,l[1]))));
       addHole(A.up,w); addHole(Bc.up,w);
     }
-  });
+  };
+  cells.forEach(c=>{if(c.occ&&c.occ.cat==='stair')stairHoles(c);});
 
-  /* stage 4b: every capsule needs a door and something to step onto in front of it */
-  const doors=[],balconies=[],doorSet=new Set(),acc={doors:0,deck:0,balc:0,fail:0};
-  const isWalk=id=>id>=0&&cells[id].occ&&['floor','stair'].includes(cells[id].occ.cat);
-  cells.forEach(c=>{
-    const o=c.occ; if(!o||o.cat!=='capsule') return;
-    if((o.pair||o.group)&&!o.main) return;
-    let cand=[];
+  /* stage 4c: every capsule gets a door with something to step onto */
+  const acc={doors:0,deck:0,balc:0,fail:0},caps=[];
+  const candOf=c=>{const o=c.occ,cand=[];
     if(o.pair) o.pair.forEach(id=>cells[id].nb.forEach((b,k)=>{if(!o.pair.includes(b))cand.push([id,k]);}));
     else if(o.group) o.group.ids.forEach(id=>cells[id].nb.forEach((b,k)=>{if(!o.group.ids.includes(b))cand.push([id,k]);}));
     else c.nb.forEach((b,k)=>{if(k!==o.out)cand.push([c.id,k]);});
+    return cand;};
+  cells.forEach(c=>{
+    const o=c.occ; if(!o||o.cat!=='capsule') return;
+    if((o.pair||o.group)&&!o.main) return;
     const score=([id,k])=>{const b=cells[id].nb[k],lv=cells[id].level;
-      if(isWalk(b)) return 4;
+      if(b>=0&&cells[b].occ&&cells[b].occ.cat==='floor') return 4;
       if(lv===0&&(b<0||cells[b].occ.cat==='void')) return 3;
       if(b>=0&&cells[b].occ&&cells[b].occ.n===21) return 2;
       if(b<0) return 1; return 0;};
-    let best=null,bs=0; shuffle(r,cand).forEach(e=>{const sc=score(e);if(sc>bs){bs=sc;best=e;}});
-    if(!best){
-      if(!o.pair&&!o.group){counts[o.n]--;c.occ=null;setFloor(c,false);}
-      acc.fail++; return;
-    }
-    const [id,k]=best,b=cells[id].nb[k];
-    if(bs===2){counts[21]--;cells[b].occ=null;setFloor(cells[b],true);tally.forcedFloor--;acc.deck++;}
-    if(bs===1){balconies.push({id,k});use(14,true);acc.balc++;}
-    doorSpec(cells,c,o,cells[id],k).forEach(d=>doors.push(d)); acc.doors++;
-    doorSet.add(id+'|'+k);
+    let best=null,bs=0; shuffle(r,candOf(c)).forEach(e=>{const sc=score(e);if(sc>bs){bs=sc;best=e;}});
+    if(!best){ if(!o.pair&&!o.group){counts[o.n]--;c.occ=null;setFloor(c,false);} acc.fail++; return; }
+    const [id,k]=best;
+    if(bs===2){toDeck(cells[id].nb[k]);acc.deck++;}
+    o.door={id,k,mode:bs===1?'balcony':'front'}; if(bs===1){use(14,true);acc.balc++;}
+    caps.push(c);
   });
+
+  /* stage 4d: connectivity — walk from the ground and reach every capsule door */
+  const passAcross=(a,k)=>{const b=cells[a].nb[k]; if(b<0||!walk(a)||!walk(b)) return false;
+    const ea=cells[a].occ.cat==='stair'?entryOf(cells[a]):null; if(ea&&!ea.includes(k)) return false;
+    const eb=cells[b].occ.cat==='stair'?entryOf(cells[b]):null; if(eb&&!eb.includes(cells[b].nb.indexOf(a))) return false;
+    return true;};
+  const reachSet=()=>{
+    const R=new Set(),q=[],push=id=>{if(id>=0&&!R.has(id)&&walk(id)){R.add(id);q.push(id);}};
+    cells.forEach(c=>{ if(c.level!==0||!walk(c.id)) return;
+      if(c.occ.cat!=='stair'){push(c.id);return;}
+      const e=entryOf(c); if(e===null||e.some(k=>c.nb[k]<0)) push(c.id); });
+    while(q.length){
+      const a=q.shift(),c=cells[a],o=c.occ;
+      c.nb.forEach((b,k)=>{if(b>=0&&!R.has(b)&&passAcross(a,k))push(b);});
+      if(o.pair&&o.cat!=='stair') o.pair.forEach(push);
+      if(o.pair&&o.cat==='stair'&&o.pair[0]===a) push(o.pair[1]);
+      if(o.group) o.group.ids.forEach(push);
+      if(o.cat==='stair'){ if(o.n===25){ if(o.pair[1]===a) push(c.up); } else push(c.up); }
+      if(c.down>=0){const d=cells[c.down],dn=d.occ; if(dn&&dn.cat==='stair'){ if(dn.n===25){ if(dn.pair[1]===d.id) push(d.id); } else push(d.id); }}
+    }
+    return R;};
+  const doorOK=(dr,R)=>{const c=cells[dr.id],b=c.nb[dr.k];
+    if(dr.mode==='ladder') return true;
+    if(c.level===0&&(b<0||(cells[b].occ&&cells[b].occ.cat==='void'))) return true;
+    if(b<0||!R.has(b)) return false;
+    if(cells[b].occ.cat==='stair'){const e=entryOf(cells[b]); if(e&&!e.includes(cells[b].nb.indexOf(dr.id))) return false;}
+    return true;};
+  const con={moved:0,stair:0,ladder:0,drop:0};
+  for(let it=0;it<80;it++){
+    const R=reachSet();
+    const bad=caps.find(c=>c.occ&&c.occ.cat==='capsule'&&c.occ.door&&!c.occ.stuck&&!doorOK(c.occ.door,R));
+    if(!bad) break;
+    const o=bad.occ,cand=shuffle(r,candOf(bad));
+    const good=cand.find(([id,k])=>doorOK({id,k,mode:'front'},R)&&(cells[id].nb[k]<0?cells[id].level===0:cells[cells[id].nb[k]].occ.cat!=='capsule'));
+    if(good){o.door={id:good[0],k:good[1],mode:'front'};con.moved++;continue;}
+    let fixed=false;
+    const tryList=[];
+    cand.forEach(([id,k])=>{
+      const F=cells[id].nb[k]; if(F<0||!cells[F].occ||cells[F].occ.cat!=='floor'||cells[F].level===0) return;
+      const comp=[F],seen=new Set([F]);
+      for(let i=0;i<comp.length;i++) cells[comp[i]].nb.forEach((b,kk)=>{if(b>=0&&!seen.has(b)&&cells[b].occ&&cells[b].occ.cat==='floor'&&passAcross(comp[i],kk)){seen.add(b);comp.push(b);}});
+      comp.forEach(X=>tryList.push([id,k,X]));
+    });
+    for(const [id,k,X] of tryList){
+      const Fc=cells[X];
+      if(Fc.occ.pair||Fc.holes) continue;
+      const D=cells[Fc.down]; if(!D||!D.occ||D.occ.pair||D.holes||D.occ.court) continue;
+      const isFloor=D.occ.cat==='floor'&&R.has(D.id), isVoid=D.occ.n===21;
+      if(!isFloor&&!isVoid) continue;
+      const n=D.shape==='sq'&&(has(24)||!has(28))?24:28, old=D.occ.n;
+      let rot=0;
+      if(n===24){
+        const ok=[0,1,2,3].filter(rt=>{const kk=edgeToward(D,mul(frameRot(D,rt).x,-1)),b=D.nb[kk];
+          return D.level===0?(b<0||(cells[b].occ&&!['capsule','stair'].includes(cells[b].occ.cat))):(b>=0&&R.has(b)&&cells[b].occ.cat==='floor');});
+        if(!ok.length) continue; rot=pick(r,ok);
+      }
+      D.occ={n,cat:'stair',rot};
+      if(isVoid){counts[21]--; if(D.level>0) giveBase(D);}
+      else if(D.level>0) D.occ.base=old; else counts[old]--;
+      use(n,!has(n)); stairHoles(D);
+      o.door={id,k,mode:'front'}; con.stair++; fixed=true; break;
+    }
+    if(fixed) continue;
+    const out=cand.find(([id,k])=>cells[id].nb[k]<0);
+    if(out){o.door={id:out[0],k:out[1],mode:'ladder'};use(28,true);use(14,true);con.ladder++;continue;}
+    if(!o.pair&&!o.group){counts[o.n]--;bad.occ=null;setFloor(bad,false);} else o.stuck=true;
+    con.drop++;
+  }
+  const reachFinal=reachSet();
+  const doors=[],balconies=[],doorSet=new Set();
+  caps.forEach(c=>{const o=c.occ;if(!o||o.cat!=='capsule'||!o.door)return;
+    doorSpec(cells,c,o,cells[o.door.id],o.door.k).forEach(d=>doors.push(d)); acc.doors++;
+    if(o.door.mode!=='front') balconies.push({id:o.door.id,k:o.door.k,ladder:o.door.mode==='ladder'});
+    doorSet.add(o.door.id+'|'+o.door.k);});
+  acc.balc=balconies.filter(b=>!b.ladder).length;
+  const unreached=caps.filter(c=>c.occ&&c.occ.cat==='capsule'&&c.occ.door&&!doorOK(c.occ.door,reachFinal)).length;
 
   /* stage 5: roof, facade, green */
   const tops={};
@@ -516,7 +624,7 @@ function generate(pool,frame,sizeKey,seed,notes){
   const roof=[];
   Object.values(tops).forEach(id=>{
     const c=cells[id]; if(!c.occ||['void','open'].includes(c.occ.cat)) return;
-    if(has(12)&&c.shape==='sq'&&c.occ.cat==='floor'&&!c.occ.pair&&!c.holes&&r()<.25){roof.push({n:12,id});use(12);use(28,true);return;}
+    if(has(12)&&c.shape==='sq'&&c.occ.cat==='floor'&&!c.occ.pair&&!c.holes&&reachFinal.has(id)&&r()<.25){roof.push({n:12,id});use(12);use(28,true);return;}
     if(has(38)&&r()*100<rv.green*.5){roof.push({n:38,id});use(38);use(14,true);}
   });
   const fac=[];
@@ -549,10 +657,12 @@ function generate(pool,frame,sizeKey,seed,notes){
   if(tally.retry) notes.push({t:'결합 규칙 위반으로 다시 뽑은 칸 '+tally.retry+'곳'});
   if(baseTally.n) notes.push({t:'계단 밑 바닥 규칙: 2층 이상 계단 '+baseTally.n+'곳에 바닥을 깔고, 도착층 바닥에 계단 구멍을 냄',c:'ok'});
   if(acc.doors) notes.push({t:'캡슐 출입 규칙: 문 '+acc.doors+'개'+(acc.deck?' · 문 앞 비움을 데크로 보정 '+acc.deck+'곳':'')+(acc.balc?' · 바깥 발코니 '+acc.balc+'곳':''),c:'ok'});
+  if(stairFix.rot||stairFix.deck||stairFix.drop) notes.push({t:'계단 입구 규칙: 입구가 디딜 곳을 향하도록 '+stairFix.rot+'곳 회전'+(stairFix.deck?' · 입구 앞 비움을 데크로 '+stairFix.deck+'곳':'')+(stairFix.drop?' · 입구가 막힌 계단 '+stairFix.drop+'곳을 데크로 교체':''),c:stairFix.drop?'warn':'ok'});
+  notes.push({t:'연결성 규칙: '+(unreached?'1층과 이어지지 않은 캡슐 '+unreached+'개':'모든 캡슐이 1층에서 걸어서 닿음')+(con.moved?' · 문 위치 변경 '+con.moved:'')+(con.stair?' · 계단 추가 '+con.stair:'')+(con.ladder?' · 바깥 사다리 '+con.ladder:'')+(con.drop?' · 데크로 교체 '+con.drop:''),c:unreached?'warn':'ok'});
   if(acc.fail) notes.push({t:'사방이 막혀 들어갈 수 없는 캡슐 '+acc.fail+'개를 데크로 교체',c:'warn'});
   if(roof.some(x=>x.n===12)&&!has(28)) notes.push({t:'28 사다리 자동 보충: 지붕 위 캡슐로 올라가는 길',c:'warn'});
   Object.keys(counts).forEach(k=>{if(counts[k]<=0)delete counts[k];});
-  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies};
+  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies,unreached,con,stairFix};
 }
 
 /* ================= RENDER ================= */
@@ -634,6 +744,7 @@ function capPrism(g,pts,y0,h,r){const b=.07;
   const geo=new THREE.ExtrudeGeometry(roundedPoly(pts.map(p=>[p[0],-p[1]]),r),{depth:h-2*b,bevelEnabled:true,bevelThickness:b,bevelSize:b,bevelSegments:3,curveSegments:8});
   geo.rotateX(-PI/2);geo.translate(0,y0+b,0);g.add(sh(new THREE.Mesh(geo,M.capsule)));outline(g,geo);}
 function shrub(g,x,y,z,r){const m=new THREE.Mesh(new THREE.IcosahedronGeometry(r,0),M.leaf);m.position.set(x,y,z);g.add(sh(m));}
+function localRot(c,y0,rot){const o=new THREE.Group();o.position.set(c.c[0],y0,c.c[1]);o.rotation.y=c.fr.th+rot*PI/2;const i=new THREE.Group();i.position.set(-1.5,0,-1.5);o.add(i);root.add(o);return i;}
 function local(p0,y0,th){const g=new THREE.Group();g.position.set(p0[0],y0,p0[1]);g.rotation.y=th;root.add(g);return g;}
 function vStair(g){const n=7,L=S*.62,rise=S/2/n,run=L/n,xs=S*.12,w=1.2,zA=S*.27,zB=S*.73;
   for(let s=0;s<n;s++)B(g,run*1.02,.06,w,xs+run*(s+.5),rise*(s+1),zA,M.stair);
@@ -671,6 +782,9 @@ function renderBalcony(res,bk){
   const e=add(mid,mul(n,1.15)),a=add(e,mul(u,L*.44)),b=add(e,mul(u,-L*.44));
   bar(root,[a[0],y0+1.0,a[1]],[b[0],y0+1.0,b[1]],.04,M.stair);
   [a,b].forEach(v=>bar(root,[v[0],y0+.18,v[1]],[v[0],y0+1.0,v[1]],.04,M.stair));
+  if(bk.ladder){const e2=add(mid,mul(n,1.3)),l1=add(e2,mul(u,.225)),l2=add(e2,mul(u,-.225));
+    [l1,l2].forEach(v=>bar(root,[v[0],0,v[1]],[v[0],y0+1.0,v[1]],.035,M.stair));
+    for(let y=.3;y<y0+.9;y+=.3) bar(root,[l1[0],y,l1[1]],[l2[0],y,l2[1]],.03,M.stair);}
 }
 function renderBody(c,res,r){
   const o=c.occ; if(!o||o.n===0) return;
@@ -722,7 +836,7 @@ function renderBody(c,res,r){
     case 17: B(g,3,.18,1.5,1.5,.09,2.25,M.deck);B(g,3,.18,1.5,1.5,1.59,.75,M.deck);break;
     case 18: B(g,Math.hypot(3,.5),.18,3,1.5,.34,1.5,M.deck,Math.atan2(.5,3));break;
     case 23: B(g,3,.18,3,1.5,2.91,1.5,M.deck);break;
-    case 24: vStair(g);break;
+    case 24: vStair(localRot(c,y0,o.rot||0));break;
     case 28: ladder(g,.3,.3);break;
   }
 }
