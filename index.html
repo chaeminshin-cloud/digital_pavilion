@@ -15,16 +15,16 @@
 /* Layout: drafting-table split — live 3D pavilion left, mode / element tray / result log right (stacks on phones) */
 :root{
   --bg:#eceeea; --panel:#f7f8f5; --ink:#1c2125; --muted:#5f686d; --line:#d2d7d2; --soft:#e3e6e1;
-  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499;
+  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499; --brace:#a23b84; --joint:#138a99;
   --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
-  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}}
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
-  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; color-scheme:dark}
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; color-scheme:dark}
 
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
@@ -104,11 +104,13 @@ summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-
     <canvas id="cv" aria-label="조합된 파빌리온 3D 모델"></canvas>
     <div class="ov ov-top">
       <div class="pill" id="frameinfo">틀 준비 중</div>
-      <div class="row"><button class="ghostbtn" id="exportdae">SketchUp용 내보내기 (.dae)</button><button class="ghostbtn" id="resetview">시점 초기화</button></div>
+      <div class="row"><button class="ghostbtn" id="structview" aria-pressed="false">구조만 보기</button><button class="ghostbtn" id="exportdae">SketchUp용 내보내기 (.dae)</button><button class="ghostbtn" id="resetview">시점 초기화</button></div>
     </div>
     <div class="ov ov-bot">
       <div class="legend">
         <span><i style="background:var(--ink)"></i>뼈대</span>
+        <span><i style="background:var(--brace)"></i>브레이싱</span>
+        <span><i style="background:var(--joint)"></i>조인트</span>
         <span><i style="background:var(--capsule)"></i>끼우기</span>
         <span><i style="background:var(--deck)"></i>채우기</span>
         <span><i style="background:var(--stair)"></i>사선</span>
@@ -145,6 +147,25 @@ summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-
         <button class="btn2" id="pickAll">전체</button>
         <button class="btn2" id="pickNone">모두 끄기</button>
       </div>
+    </section>
+
+    <section class="stack" id="structBox">
+      <h2>③ 층수 · 구조 규칙</h2>
+      <div class="seg small" role="group" aria-label="최고 층수" id="floorSeg">
+        <button data-v="0" aria-pressed="true">자동</button>
+        <button data-v="1" aria-pressed="false">1</button><button data-v="2" aria-pressed="false">2</button><button data-v="3" aria-pressed="false">3</button><button data-v="4" aria-pressed="false">4</button>
+        <button data-v="5" aria-pressed="false">5</button><button data-v="6" aria-pressed="false">6</button><button data-v="7" aria-pressed="false">7</button><button data-v="8" aria-pressed="false">8</button>
+      </div>
+      <div class="seg small" role="group" aria-label="브레이싱 방식" id="braceSeg">
+        <button data-v="graded" aria-pressed="true">브레이싱 층별 차등</button>
+        <button data-v="uniform" aria-pressed="false">통일</button>
+        <button data-v="off" aria-pressed="false">끄기</button>
+      </div>
+      <div class="seg small" role="group" aria-label="조인트 표시" id="jointSeg">
+        <button data-v="on" aria-pressed="true">조인트 표시</button>
+        <button data-v="off" aria-pressed="false">숨기기</button>
+      </div>
+      <p class="sub" style="margin:0">층수를 고르면 가장 높은 기둥이 그 층수가 돼요. 3층 이상인 기둥은 아래층부터 브레이싱이 들어가고, 출입구 면은 무릎가새로 바꿔 지나다닐 수 있게 둬요.</p>
     </section>
 
     <section class="stack">
@@ -256,14 +277,15 @@ function profileHeights(r,nx,maxH){
   }
   return H;
 }
-function makeCells(frame,sz,r){
-  const cells=[],cols=[],info={};
+function makeCells(frame,sz,r,target){
+  const cells=[],cols=[],info={},maxH=target||sz.H;
   const addCol=(polyFn,shape,H,extra)=>{
     const cid=cols.length; cols.push({H,shape,...extra});
     for(let j=0;j<H;j++){const poly=polyFn(j);cells.push({id:cells.length,poly,shape,level:j,col:cid,c:cen(poly),...extra});}
   };
   if(frame===1||frame===4){
-    const nx=sz.nx,nz=sz.nz,Hrow=profileHeights(r,nx,sz.H);
+    const nx=sz.nx,nz=sz.nz,Hrow=profileHeights(r,nx,maxH);
+    if(target){const m=Math.max(...Hrow);if(m<target)Hrow[Hrow.indexOf(m)]=target;}
     for(let i=0;i<nx;i++)for(let k=0;k<nz;k++){
       const H=Math.max(1,Hrow[i]-(k>0&&r()<.3?1:0));
       addCol(j=>{const s=frame===4&&j%2?1.5:0,x=i*S+s,z=k*S;return[[x,z],[x+S,z],[x+S,z+S],[x,z+S]];},'sq',H,{});
@@ -279,10 +301,11 @@ function makeCells(frame,sz,r){
     }
     const foots=[];
     centers.forEach((c,hi)=>{
-      const hexH=Math.min(sz.H,2+Math.floor(r()*(sz.H-1)));
+      let hexH=Math.min(maxH,2+Math.floor(r()*(maxH-1)));
+      const peak=target&&hi===0; if(peak) hexH=target;
       const V=hexPts(S,c[0],c[1]);
       for(let k=0;k<6;k++){
-        const poly=[c,V[k],V[(k+1)%6]],H=Math.max(1,hexH-(r()<.2?1:0));
+        const drop=r()<.2&&!peak,poly=[c,V[k],V[(k+1)%6]],H=Math.max(1,hexH-(drop?1:0));
         foots.push(cen(poly)); addCol(()=>poly,'tri',H,{hex:hi,tk:k,hexC:c});
       }
     });
@@ -298,7 +321,7 @@ function makeCells(frame,sz,r){
           const n=edgeOut(V,k),p=V[k],q=V[(k+1)%6];
           const sq=[p,q,add(q,mul(n,S)),add(p,mul(n,S))];
           if(!ok(sq)) continue;
-          const h=1+Math.floor(r()*Math.max(1,sz.H-1));
+          const h=1+Math.floor(r()*Math.max(1,maxH-1));
           foots.push(cen(sq)); addCol(()=>sq,'sq',h,{}); nSq++; ring[k]={n,h};
           if(r()<.4){const sq2=[add(p,mul(n,S)),add(q,mul(n,S)),add(q,mul(n,2*S)),add(p,mul(n,2*S))];
             if(ok(sq2)){const h2=Math.max(1,h-(r()<.5?1:0));foots.push(cen(sq2));addCol(()=>sq2,'sq',h2,{});nSq++;}}
@@ -349,9 +372,10 @@ function doorSpec(cells,c,o,dc,k){
   if(o.n===11) return[{p,n:dn,y:y0+1.12,w:.8,h:1.15,steps:true,base:y0}];
   return[{p,n:dn,y:y0+.2,w:.85,h:1.85}];
 }
-function generate(pool,frame,sizeKey,seed,notes){
-  const r=makeRng('layout|'+seed+'|'+frame+'|'+sizeKey+'|'+[...pool].join('.'));
-  const {cells,cols,info}=makeCells(frame,SIZES[sizeKey],r);
+function generate(pool,frame,sizeKey,seed,notes,opt){
+  opt=opt||{};
+  const r=makeRng('layout|'+seed+'|'+frame+'|'+sizeKey+(opt.floors?'|F'+opt.floors:'')+'|'+[...pool].join('.'));
+  const {cells,cols,info}=makeCells(frame,SIZES[sizeKey],r,opt.floors);
   const shapes=FRAME_SHAPES[frame];
   const counts={},auto=new Set(),P=[];
   const has=n=>pool.has(n);
@@ -647,8 +671,38 @@ function generate(pool,frame,sizeKey,seed,notes){
     Object.values(vs).forEach(v=>{if(r()*100<rv.green*.22){greens.push({n:37,p:v.p,h:v.h*S});use(37);}});
   }
 
+  /* stage 6: bracing — columns of 3+ floors get braces on their outer faces, bottom levels first.
+     graded: 1st braced level X on every face, 2nd X/single diagonal alternating, 3rd+ single diagonal on every other face.
+     uniform: X on every face of every braced level. Faces people pass through get knee braces instead. */
+  const braceLevels=H=>H<3?0:Math.floor(H/2);
+  const braces=[],bt={X:0,D:0,K:0,cols:new Set(),levels:0};
+  const passage=(c,k)=>{const o=c.occ;
+    if(doorSet.has(c.id+'|'+k)) return true;
+    if(o&&o.out===k) return true;
+    if(c.level===0&&(!o||['floor','stair','void','open'].includes(o.cat))) return true;
+    return false;};
+  if(opt.brace!=='off') cells.forEach(c=>{
+    const nb=braceLevels(cols[c.col].H),t=c.level; if(t>=nb) return;
+    bt.cols.add(c.col); bt.levels=Math.max(bt.levels,nb);
+    c.outer.forEach(k=>{
+      let type;
+      if(passage(c,k)) type='K';
+      else if(opt.brace==='uniform'||t===0) type='X';
+      else if(t===1) type=(k+c.col)%2?'D':'X';
+      else type=(k+c.col+t)%2?null:'D';
+      if(!type) return;
+      braces.push({id:c.id,k,type,flip:(t+k)%2}); bt[type]++;
+    });
+  });
+
   /* notes */
   notes.push({t:'틀: '+info.text+' · 칸 '+cells.length+'개'});
+  const topH=Math.max(...cols.map(c=>c.H));
+  notes.push({t:'층수 규칙: '+(opt.floors?'입력한 '+opt.floors+'층에 맞춰 가장 높은 기둥을 '+topH+'층으로 세움':'자동 · 가장 높은 기둥 '+topH+'층'),c:'ok'});
+  if(opt.brace!=='off'){
+    if(braces.length) notes.push({t:'구조 규칙: 3층 이상 기둥 '+bt.cols.size+'개의 아래 '+bt.levels+'개 층까지 브레이싱 — 교차가새 '+bt.X+'면'+(bt.D?' · 외가새 '+bt.D+'면':'')+(bt.K?' · 출입구 무릎가새 '+bt.K+'면':''),c:'ok'});
+    else notes.push({t:'구조 규칙: 3층 이상 기둥이 없어 브레이싱 없이 섬'});
+  }
   const mk=Object.entries(tally.multi); if(mk.length) notes.push({t:'큰 원소 먼저 배치: '+mk.map(([n,c])=>n+' '+byN[n].name+' ×'+c).join(', '),c:'ok'});
   if(tally.forcedFloor) notes.push({t:'계단 도착 바닥 '+tally.forcedFloor+'곳을 데크로 보정'});
   if(tally.autoFloor) notes.push({t:'14 슬래브 자동 보충: 맞는 바닥 원소가 없어 계단 도착 바닥 '+tally.autoFloor+'곳에 사용',c:'warn'});
@@ -662,12 +716,14 @@ function generate(pool,frame,sizeKey,seed,notes){
   if(acc.fail) notes.push({t:'사방이 막혀 들어갈 수 없는 캡슐 '+acc.fail+'개를 데크로 교체',c:'warn'});
   if(roof.some(x=>x.n===12)&&!has(28)) notes.push({t:'28 사다리 자동 보충: 지붕 위 캡슐로 올라가는 길',c:'warn'});
   Object.keys(counts).forEach(k=>{if(counts[k]<=0)delete counts[k];});
-  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies,unreached,con,stairFix};
+  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies,unreached,con,stairFix,braces,topH};
 }
 
 /* ================= RENDER ================= */
 const M={
   frame:new THREE.MeshStandardMaterial({roughness:.6,metalness:.1}),
+  brace:new THREE.MeshStandardMaterial({roughness:.5,metalness:.2}),
+  joint:new THREE.MeshStandardMaterial({roughness:.4,metalness:.3}),
   capsule:new THREE.MeshStandardMaterial({roughness:.45}),
   capLine:new THREE.LineBasicMaterial(),
   deck:new THREE.MeshStandardMaterial({roughness:.85}),
@@ -686,11 +742,25 @@ const M={
 };
 (function(){const c=document.createElement('canvas');c.width=552;c.height=520;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,552,520);x.fillStyle='#000';
   for(let i=5;i<552;i+=10)for(let j=5;j<520;j+=10){x.beginPath();x.arc(i,j,2.2,0,PI*2);x.fill();}M.perf.alphaMap=new THREE.CanvasTexture(c);})();
-const MAT_NAME={frame:'R1_뼈대',capsule:'R2_캡슐',deck:'R3_바닥',deckGlass:'R3_반투명바닥',stair:'R4_계단',facade:'파사드',perf:'파사드_타공',cloth:'파사드_천막',glassF:'파사드_유리',leaf:'그린_식재',pot:'그린_화분줄기',soil:'그린_토양',paving:'R3_중정포장',door:'R2_캡슐문'};
-const EXPORT_COL={frame:'#1c2125',capsule:'#a3b4dc',deck:'#cf3439',deckGlass:'#cf3439',stair:'#df7f22',facade:'#676a86',perf:'#676a86',cloth:'#676a86',glassF:'#676a86',leaf:'#3b8a4d',pot:'#5f686d',soil:'#464d52',paving:'#a5aaa8',door:'#2a3550'};
+const MAT_NAME={frame:'R1_뼈대',brace:'R1_브레이싱',joint:'R1_조인트',capsule:'R2_캡슐',deck:'R3_바닥',deckGlass:'R3_반투명바닥',stair:'R4_계단',facade:'파사드',perf:'파사드_타공',cloth:'파사드_천막',glassF:'파사드_유리',leaf:'그린_식재',pot:'그린_화분줄기',soil:'그린_토양',paving:'R3_중정포장',door:'R2_캡슐문'};
+const EXPORT_COL={frame:'#1c2125',brace:'#a23b84',joint:'#138a99',capsule:'#a3b4dc',deck:'#cf3439',deckGlass:'#cf3439',stair:'#df7f22',facade:'#676a86',perf:'#676a86',cloth:'#676a86',glassF:'#676a86',leaf:'#3b8a4d',pot:'#5f686d',soil:'#464d52',paving:'#a5aaa8',door:'#2a3550'};
 let lastSeed='';
+/* structure view: ghost the infill, hide facade/green so frame + braces + joints read clearly */
+const GHOST=['capsule','deck','deckGlass','stair','door','paving'];
+function applyStruct(){
+  GHOST.forEach(k=>{const m=M[k];if(!m.userData.base)m.userData.base={t:m.transparent,o:m.opacity,dw:m.depthWrite};const b=m.userData.base;
+    if(ui.struct){m.transparent=true;m.opacity=.13;m.depthWrite=false;}else{m.transparent=b.t;m.opacity=b.o;m.depthWrite=b.dw;}m.needsUpdate=true;});
+  M.capLine.transparent=ui.struct;M.capLine.opacity=ui.struct?.25:1;M.capLine.needsUpdate=true;
+  if(!root) return;
+  root.children.forEach(bin=>{const n=parseInt(bin.name,10);bin.visible=!(ui.struct&&n>=29);});
+  root.traverse(o=>{if(o.isMesh&&GHOST.some(k=>M[k]===o.material)){if(o.userData.cs===undefined)o.userData.cs=o.castShadow;o.castShadow=ui.struct?false:o.userData.cs;}});
+}
 function exportDAE(){
   if(!root) return;
+  const wasStruct=ui.struct; if(wasStruct){ui.struct=false;applyStruct();}
+  try{exportDAEInner();}finally{if(wasStruct){ui.struct=true;applyStruct();}}
+}
+function exportDAEInner(){
   const clone=root.clone(true),cache=new Map(),drop=[];
   clone.updateMatrixWorld(true);
   clone.traverse(o=>{
@@ -716,7 +786,7 @@ let grid=null;
 function applyColors(scene){
   const c=n=>new THREE.Color(tok(n)),bg=c('--bg'),ink=c('--ink'),dark=bg.getHSL({}).l<.5;
   scene.background=bg;
-  M.frame.color=ink; M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
+  M.frame.color=ink; M.brace.color=c('--brace'); M.joint.color=c('--joint'); M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
   M.deck.color=c('--deck'); M.deckGlass.color=c('--deck'); M.stair.color=c('--stair');
   ['facade','perf','cloth','glassF'].forEach(k=>M[k].color=c('--facade'));
   M.leaf.color=c('--green'); M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35); M.paving.color=c('--muted').lerp(bg,.5); M.door.color=ink.clone().lerp(c('--capsule'),.35);
@@ -756,6 +826,40 @@ function plant(g,x,y,z){B(g,.9,.38,.42,x,y+.19,z,M.pot);shrub(g,x-.28,y+.52,z,.2
 function tree(g,x,z,r){const t=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,2,8),M.pot);t.position.set(x,1,z);g.add(sh(t));
   const c=new THREE.Mesh(new THREE.IcosahedronGeometry(.85+r()*.3,1),M.leaf);c.position.set(x,2.55,z);c.scale.y=.9;g.add(sh(c));}
 const shrink=(pts,f)=>{const c=cen(pts);return pts.map(p=>add(c,mul(sub(p,c),f)));};
+
+/* ---------- joints: how a capsule hangs on the frame ----------
+   rails under the capsule sit on the frame beams; corner anchors tie the capsule sides to the nearest column;
+   a capsule that sticks out of the frame (7) gets tie rods from the rail ends back up to the top beam. */
+function capMount(g,m){
+  if(!ui.joints) return;
+  const P=(x,y,z)=>m.swap?[z,y,x]:[x,y,z],cube=(x,y,z,s)=>{const p=P(x,y,z);B(g,s,s,s,p[0],p[1],p[2],M.joint);};
+  const span=m.span||3,cx=m.colsX||[0,span],ex0=Math.min(0,m.x0),ex1=Math.max(span,m.x1),yb=m.yb;
+  [m.z0+.35,m.z1-.35].forEach(z=>{
+    bar(g,P(ex0,yb-.05,z),P(ex1,yb-.05,z),.1,M.joint);
+    if(m.tie){const xe=m.tie>0?ex1:ex0,xf=m.tie>0?span:0;bar(g,P(xe,yb-.05,z),P(xf,S,z),.04,M.joint);cube(xe,yb-.05,z,.14);cube(xf,S-.07,z,.14);}
+  });
+  const xs=[m.x0,m.x1,...cx.filter(v=>v>m.x0+.1&&v<m.x1-.1)];
+  xs.forEach(x=>[m.z0,m.z1].forEach(z=>{
+    const col=cx.reduce((a,b)=>Math.abs(b-x)<Math.abs(a-x)?b:a),cz=z<1.5?0:3;
+    if(Math.abs(col-x)>.8) return;
+    (m.h>1.2?[yb+.3,yb+m.h-.3]:[yb+m.h/2]).forEach(y=>{bar(g,P(x,y,z),P(col,y,cz),.05,M.joint);cube(col,y,cz,.15);cube(x,y,z,.1);});
+  }));
+}
+function prismMount(pts,frame,y0,yb,h){
+  if(!ui.joints) return;
+  pts.forEach((p,i)=>{const f=frame[i];if(dist(p,f)>2.2)return;
+    bar(root,[p[0],yb-.05,p[1]],[f[0],y0+.05,f[1]],.08,M.joint);
+    bar(root,[p[0],yb+h-.1,p[1]],[f[0],y0+S-.05,f[1]],.04,M.joint);
+    B(root,.12,.12,.12,p[0],yb-.05,p[1],M.joint);B(root,.12,.12,.12,p[0],yb+h-.1,p[1],M.joint);});
+}
+function renderBrace(res,b){
+  const c=res.cells[b.id],p=c.poly[b.k],q=c.poly[(b.k+1)%c.poly.length],y0=c.level*S,y1=y0+S,t=.085,P=(v,y)=>[v[0],y,v[1]];
+  if(b.type==='X'){bar(root,P(p,y0),P(q,y1),t,M.brace);bar(root,P(q,y0),P(p,y1),t,M.brace);
+    if(ui.joints){const m=mul(add(p,q),.5);B(root,.2,.2,.2,m[0],y0+S/2,m[1],M.joint);}}
+  else if(b.type==='D'){const [a,e]=b.flip?[q,p]:[p,q];bar(root,P(a,y0),P(e,y1),t,M.brace);}
+  else{const u=nrm(sub(q,p)),kL=Math.min(.9,dist(p,q)*.3);
+    bar(root,P(p,y1-kL),P(add(p,mul(u,kL)),y1),t,M.brace);bar(root,P(q,y1-kL),P(sub(q,mul(u,kL)),y1),t,M.brace);}
+}
 
 function holeSlab(g,h,mat){
   const [x0,x1,z0,z1]=h,pcs=[[0,3,0,z0],[0,3,z1,3],[0,x0,z0,z1],[x1,3,z0,z1]];
@@ -798,7 +902,7 @@ function renderBody(c,res,r){
     }
     const dir=nrm(sub(Bc.c,A.c)),z=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(z,1.5));
     const g=local(org,y0,Math.atan2(-dir[1],dir[0]));
-    if(o.n===8) capRect(g,5.4,2.0,2.34,3,.15,1.5);
+    if(o.n===8){capRect(g,5.4,2.0,2.34,3,.15,1.5);capMount(g,{x0:.3,x1:5.7,z0:.33,z1:2.67,yb:.15,h:2,span:6,colsX:[0,3,6]});}
     else if(o.n===25){const n=14,rs=3/n,t=.28,x0=1.04;for(let s=0;s<n;s++)B(g,t,.05,1.0,x0+t*(s+.5),rs*(s+1),1.5,M.stair);
       const L=Math.hypot(n*t,3),a=Math.atan2(3,n*t);B(g,L,.2,.05,x0+n*t/2,1.5,1.0,M.stair,a);B(g,L,.2,.05,x0+n*t/2,1.5,2.0,M.stair,a);}
     else if(o.n===27){const a=Math.atan2(.5,6);B(g,Math.hypot(6,.5),.15,1.2,3,.325,1.5,M.stair,a);bar(g,[0,1.05,.9],[6,1.55,.9],.04,M.stair);bar(g,[0,1.05,2.1],[6,1.55,2.1],.04,M.stair);}
@@ -807,14 +911,14 @@ function renderBody(c,res,r){
   if(o.group){
     if(!o.main) return;
     const hc=res.cells[o.group.ids[0]].hexC;
-    if(o.n===10) capPrism(root,hexPts(2.4,hc[0],hc[1]),y0+.15,2.4,.35);
+    if(o.n===10){capPrism(root,hexPts(2.4,hc[0],hc[1]),y0+.15,2.4,.35);prismMount(hexPts(2.4,hc[0],hc[1]),hexPts(S,hc[0],hc[1]),y0,y0+.15,2.4);}
     if(o.n===26){bar(root,[hc[0],y0,hc[1]],[hc[0],y0+3,hc[1]],.2,M.stair);
       for(let i=0;i<18;i++){const a=i*20*PI/180,m=B(root,1.4,.05,.36,hc[0]+.8*Math.cos(a),y0+(i+1)*3/18,hc[1]+.8*Math.sin(a),M.stair);m.rotation.y=-a;}}
     return;
   }
   if(o.court){ if(o.main) polySlab(root,hexPts(S,o.hexC[0],o.hexC[1]),0,.04,M.paving); return; }
   if(c.shape==='tri'){
-    if(o.n===9){let pts=shrink(c.poly,.73);if(o.out!==undefined){const n=edgeOut(c.poly,o.out);pts=pts.map(p=>add(p,mul(n,.9)));}capPrism(root,pts,y0+.15,2.0,.3);}
+    if(o.n===9){let pts=shrink(c.poly,.73);if(o.out!==undefined){const n=edgeOut(c.poly,o.out);pts=pts.map(p=>add(p,mul(n,.9)));}capPrism(root,pts,y0+.15,2.0,.3);prismMount(pts,c.poly,y0,y0+.15,2.0);}
     else if(o.n===14||o.n===20) polySlab(root,c.poly,y0,.18,M.deck);
     else if(o.n===16) polySlab(root,c.poly,y0,.06,M.deckGlass);
     else if(o.n===23) polySlab(root,c.poly,y0+2.82,.18,M.deck);
@@ -826,9 +930,13 @@ function renderBody(c,res,r){
   if(o.n===7){const on=edgeOut(c.poly,o.out),lx=on[0]*f.x[0]+on[1]*f.x[1],lz=on[0]*f.z[0]+on[1]*f.z[1];
     if(Math.abs(lx)>.5) B(g,1.5,.18,3,1.5-lx*.75,.09,1.5,M.deck); else B(g,3,.18,1.5,1.5,.09,1.5-lz*.75,M.deck);}
   switch(o.n){
-    case 5: case 7: {let ox=0,oz=0;if(o.out!==undefined){const n=edgeOut(c.poly,o.out);ox=(n[0]*f.x[0]+n[1]*f.x[1])*1.5;oz=(n[0]*f.z[0]+n[1]*f.z[1])*1.5;}capRect(g,2.4,2.0,2.34,1.5+ox,.15,1.5+oz);break;}
-    case 6: capRect(g,2.4,1.05,2.34,1.5,.15,1.5);capRect(g,2.4,1.05,2.34,1.5,1.3,1.5);break;
-    case 11: bar(g,[0,3,.7],[3,3,.7],.15);bar(g,[0,3,2.3],[3,3,2.3],.15);capRect(g,2.4,1.4,2.0,1.5,1.0,1.5);[[.6,.7],[2.4,.7],[.6,2.3],[2.4,2.3]].forEach(p=>bar(g,[p[0],2.35,p[1]],[p[0],3,p[1]],.03));break;
+    case 5: case 7: {let ox=0,oz=0;if(o.out!==undefined){const n=edgeOut(c.poly,o.out);ox=(n[0]*f.x[0]+n[1]*f.x[1])*1.5;oz=(n[0]*f.z[0]+n[1]*f.z[1])*1.5;}capRect(g,2.4,2.0,2.34,1.5+ox,.15,1.5+oz);
+      if(Math.abs(ox)>.1) capMount(g,{x0:.3+ox,x1:2.7+ox,z0:.33,z1:2.67,yb:.15,h:2,tie:Math.sign(ox)});
+      else if(Math.abs(oz)>.1) capMount(g,{swap:true,x0:.33+oz,x1:2.67+oz,z0:.3,z1:2.7,yb:.15,h:2,tie:Math.sign(oz)});
+      else capMount(g,{x0:.3,x1:2.7,z0:.33,z1:2.67,yb:.15,h:2});break;}
+    case 6: capRect(g,2.4,1.05,2.34,1.5,.15,1.5);capRect(g,2.4,1.05,2.34,1.5,1.3,1.5);capMount(g,{x0:.3,x1:2.7,z0:.33,z1:2.67,yb:.15,h:2.2});break;
+    case 11: bar(g,[0,3,.7],[3,3,.7],.15);bar(g,[0,3,2.3],[3,3,2.3],.15);capRect(g,2.4,1.4,2.0,1.5,1.0,1.5);[[.6,.7],[2.4,.7],[.6,2.3],[2.4,2.3]].forEach(p=>{bar(g,[p[0],2.35,p[1]],[p[0],3,p[1]],.03);if(ui.joints){B(g,.22,.04,.22,p[0],2.42,p[1],M.joint);B(g,.13,.13,.13,p[0],2.98,p[1],M.joint);}});
+      if(ui.joints)[[0,.7],[3,.7],[0,2.3],[3,2.3]].forEach(p=>B(g,.2,.2,.2,p[0],3,p[1],M.joint));break;
     case 13: for(let s=0;s<8;s++)B(g,.29,.08,3,.1875+s*.375,.04,1.5,M.deck);break;
     case 14: B(g,3,.18,3,1.5,.09,1.5,M.deck);break;
     case 15: for(let s=0;s<=14;s++)B(g,.03,.07,3,s*3/14,.035,1.5,M.deck);B(g,3,.07,.04,1.5,.035,0,M.deck);B(g,3,.07,.04,1.5,.035,3,M.deck);break;
@@ -867,11 +975,15 @@ function renderAll(res,seedStr){
     const seg=(a,b)=>{const k=[a,b].map(v=>v.map(x=>Math.round(x*100)).join(',')).sort().join('|');if(seen.has(k))return;seen.add(k);bar(root,a,b,.15);};
     for(let i=0;i<n;i++){const p=c.poly[i],q=c.poly[(i+1)%n];seg([p[0],y0,p[1]],[q[0],y0,q[1]]);seg([p[0],y0+S,p[1]],[q[0],y0+S,q[1]]);seg([p[0],y0,p[1]],[p[0],y0+S,p[1]]);}
   });
+  if(res.braces.length){intoName('R1_브레이싱');res.braces.forEach(b=>renderBrace(res,b));}
+  if(ui.joints){intoName('R1_조인트');const vs=new Set();
+    res.cells.forEach(c=>{const y0=c.level*S;c.poly.forEach(p=>[y0,y0+S].forEach(y=>{const k=pk(p)+'|'+Math.round(y*100);if(vs.has(k))return;vs.add(k);
+      B(root,.27,.27,.27,p[0],y,p[1],M.joint);if(y===0)B(root,.62,.05,.62,p[0],.025,p[1],M.joint);}));});}
   res.cells.forEach(c=>{if(c.occ&&c.occ.base){into(c.occ.base);drawFlat(c,c.occ.base,c.level*S);}if(c.occ&&c.occ.n)into(c.occ.n);renderBody(c,res,r);});
   intoName('R2_캡슐 문');res.doors.forEach(renderDoor);
   if(res.balconies.length){into(14);res.balconies.forEach(bk=>renderBalcony(res,bk));}
   res.roof.forEach(x=>{into(x.n);const c=res.cells[x.id],y=(c.level+1)*S;
-    if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);B(g,3,.08,.3,1.5,.04,.15,M.deck);
+    if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);B(g,3,.08,.3,1.5,.04,.15,M.deck);if(ui.joints)[[.3,.33],[2.7,.33],[.3,2.67],[2.7,2.67]].forEach(p=>B(g,.24,.1,.24,p[0],.09,p[1],M.joint));
       intoName('R2_캡슐 문');const gd=local(c.fr.p0,y,c.fr.th);B(gd,.8,1.45,.06,1.5,.18+.725,.3,M.door);
       into(28);const gl=local(c.fr.p0,c.level*S,c.fr.th);ladder(gl,.3,.12);}
     else{polySlab(root,c.poly,y,.18,M.deck);polySlab(root,shrink(c.poly,.97),y+.18,.1,M.pot);polySlab(root,shrink(c.poly,.97),y+.28,.16,M.soil);polySlab(root,shrink(c.poly,.97),y+.44,.03,M.leaf);}
@@ -908,13 +1020,17 @@ document.getElementById('resetview').addEventListener('click',fitView);
 document.getElementById('exportdae').addEventListener('click',exportDAE);
 
 /* ================= UI ================= */
-const ui={mode:'discover',draw:9,size:'S',pick:new Set(EL.filter(e=>e.first).map(e=>e.n))};
+const ui={mode:'discover',draw:9,size:'S',floors:0,brace:'graded',joints:true,struct:false,pick:new Set(EL.filter(e=>e.first).map(e=>e.n))};
 const $=id=>document.getElementById(id);
 const seedEl=$('seed');
 function setPressed(container,val){container.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===String(val)?'true':'false'));}
 
 $('drawSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.draw=+b.dataset.v;setPressed($('drawSeg'),ui.draw);ui.size=SIZE_BY_DRAW[ui.draw];setPressed($('sizeSeg'),ui.size);});
 $('sizeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.size=b.dataset.v;setPressed($('sizeSeg'),ui.size);run();});
+$('floorSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.floors=+b.dataset.v;setPressed($('floorSeg'),ui.floors);run();});
+$('braceSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.brace=b.dataset.v;setPressed($('braceSeg'),ui.brace);run();});
+$('jointSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.joints=b.dataset.v==='on';setPressed($('jointSeg'),b.dataset.v);run();});
+$('structview').onclick=()=>{ui.struct=!ui.struct;$('structview').setAttribute('aria-pressed',ui.struct);$('structview').textContent=ui.struct?'전체 보기':'구조만 보기';applyStruct();};
 $('discoverBtn').onclick=()=>{const base=newBase();seedEl.value=base+'/1';ui.pick=drawPool(base,ui.draw).pool;ui.discovered=ui.draw;syncMini();run();};
 $('reshuffle').onclick=()=>{const [b,v]=seedEl.value.split('/');seedEl.value=(b||newBase())+'/'+((+v||1)+1);run();};
 seedEl.addEventListener('change',run);
@@ -971,9 +1087,9 @@ function run(){
   const {pool,frame,autoFrame}=pickPool(base,notes);
   if(root){scene.remove(root);root.traverse(o=>{if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();});}
   root=new THREE.Group();scene.add(root);
-  const res=generate(pool,frame,ui.size,seedEl.value,notes);
+  const res=generate(pool,frame,ui.size,seedEl.value,notes,{floors:ui.floors,brace:ui.brace});
   res.counts[frame]=1; if(autoFrame) res.auto.add(frame);
-  renderAll(res,seedEl.value);lastSeed=seedEl.value;
+  renderAll(res,seedEl.value);lastSeed=seedEl.value;applyStruct();
   lastBox=new THREE.Box3().setFromObject(root);
   const sz=lastBox.getSize(new THREE.Vector3()),c=lastBox.getCenter(new THREE.Vector3()),span=Math.max(sz.x,sz.z,sz.y);
   sun.target.position.copy(c);sun.position.copy(c).add(new THREE.Vector3(span*.8,span*1.6,span*1.1));
@@ -982,7 +1098,7 @@ function run(){
   /* stats */
   const cat={capsule:0,floor:0,void:0,stair:0};res.cells.forEach(x=>{if(x.occ&&cat[x.occ.cat]!==undefined)cat[x.occ.cat]++;});
   $('stats').innerHTML=[['칸',res.cells.length],['채움',cat.capsule],['데크',cat.floor],['비움',cat.void],['계단',cat.stair]].map(([l,v])=>'<div><b>'+v+'</b><span>'+l+'</span></div>').join('');
-  $('frameinfo').textContent=frame+' '+byN[frame].name+' · '+res.info.text;
+  $('frameinfo').textContent=frame+' '+byN[frame].name+' · '+res.info.text+' · 최고 '+res.topH+'층';
   /* chips */
   const all=new Set([...pool,...res.auto,...Object.keys(res.counts).map(Number)]);
   const list=[...all].sort((a,b)=>a-b);
