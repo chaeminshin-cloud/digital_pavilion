@@ -15,16 +15,16 @@
 /* Layout: drafting-table split — live 3D pavilion left, mode / element tray / result log right (stacks on phones) */
 :root{
   --bg:#eceeea; --panel:#f7f8f5; --ink:#1c2125; --muted:#5f686d; --line:#d2d7d2; --soft:#e3e6e1;
-  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499; --brace:#a23b84; --joint:#138a99;
+  --capsule:#2d55c6; --deck:#cf3439; --stair:#df7f22; --green:#3b8a4d; --facade:#676a86; --void:#8a9499; --brace:#a23b84; --joint:#138a99; --person:#e8a500;
   --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
-  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; color-scheme:dark}}
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; --person:#ffd04d; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#13171a; --panel:#1a1f23; --ink:#dfe4e6; --muted:#8e989d; --line:#2c3338; --soft:#232a2f;
-  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; color-scheme:dark}
+  --capsule:#7392ff; --deck:#f05a5d; --stair:#f3a04c; --green:#66bb77; --facade:#a2a6c6; --void:#7d878c; --brace:#e07cc0; --joint:#4cc6d4; --person:#ffd04d; color-scheme:dark}
 
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px}
@@ -104,13 +104,14 @@ summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-
     <canvas id="cv" aria-label="조합된 파빌리온 3D 모델"></canvas>
     <div class="ov ov-top">
       <div class="pill" id="frameinfo">틀 준비 중</div>
-      <div class="row"><button class="ghostbtn" id="structview" aria-pressed="false">구조만 보기</button><button class="ghostbtn" id="exportdae">SketchUp용 내보내기 (.dae)</button><button class="ghostbtn" id="resetview">시점 초기화</button></div>
+      <div class="row"><button class="ghostbtn" id="structview" aria-pressed="false">구조만 보기</button><button class="ghostbtn" id="exportdae">SketchUp용 내보내기 (.dae)</button><button class="ghostbtn" id="exportcsv">부재 목록 (.csv)</button><button class="ghostbtn" id="resetview">시점 초기화</button></div>
     </div>
     <div class="ov ov-bot">
       <div class="legend">
         <span><i style="background:var(--ink)"></i>뼈대</span>
         <span><i style="background:var(--brace)"></i>브레이싱</span>
         <span><i style="background:var(--joint)"></i>조인트</span>
+        <span><i style="background:var(--person)"></i>사람 동선</span>
         <span><i style="background:var(--capsule)"></i>끼우기</span>
         <span><i style="background:var(--deck)"></i>채우기</span>
         <span><i style="background:var(--stair)"></i>사선</span>
@@ -166,6 +167,16 @@ summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-
         <button data-v="off" aria-pressed="false">숨기기</button>
       </div>
       <p class="sub" style="margin:0">층수를 고르면 가장 높은 기둥이 그 층수가 돼요. 3층 이상인 기둥은 아래층부터 브레이싱이 들어가고, 출입구 면은 무릎가새로 바꿔 지나다닐 수 있게 둬요.</p>
+    </section>
+
+    <section class="stack" id="peopleBox">
+      <h2>④ 사람 동선</h2>
+      <div class="seg small" role="group" aria-label="사람 동선" id="peopleSeg">
+        <button data-v="one" aria-pressed="true">한 명씩</button>
+        <button data-v="all" aria-pressed="false">거주자 모두</button>
+        <button data-v="off" aria-pressed="false">끄기</button>
+      </div>
+      <p class="sub" style="margin:0" id="peopleNote">밖에서 걸어 들어와 계단·사다리를 타고 자기 캡슐 문까지 가는 길이에요. 연결성 규칙이 찾은 가장 짧은 길을 그대로 걸어요.</p>
     </section>
 
     <section class="stack">
@@ -636,8 +647,8 @@ function generate(pool,frame,sizeKey,seed,notes,opt){
   const reachFinal=reachSet();
   const doors=[],balconies=[],doorSet=new Set();
   caps.forEach(c=>{const o=c.occ;if(!o||o.cat!=='capsule'||!o.door)return;
-    doorSpec(cells,c,o,cells[o.door.id],o.door.k).forEach(d=>doors.push(d)); acc.doors++;
-    if(o.door.mode!=='front') balconies.push({id:o.door.id,k:o.door.k,ladder:o.door.mode==='ladder'});
+    doorSpec(cells,c,o,cells[o.door.id],o.door.k).forEach(d=>{d.cap=c.id;doors.push(d);}); acc.doors++;
+    if(o.door.mode!=='front') balconies.push({id:o.door.id,k:o.door.k,ladder:o.door.mode==='ladder',cap:c.id});
     doorSet.add(o.door.id+'|'+o.door.k);});
   acc.balc=balconies.filter(b=>!b.ladder).length;
   const unreached=caps.filter(c=>c.occ&&c.occ.cat==='capsule'&&c.occ.door&&!doorOK(c.occ.door,reachFinal)).length;
@@ -695,6 +706,62 @@ function generate(pool,frame,sizeKey,seed,notes,opt){
     });
   });
 
+  /* stage 7: circulation — shortest walk from outside the pavilion to every capsule door.
+     Uses the same moves as the connectivity rule; stairs become real step-by-step waypoints. */
+  const routes=[];
+  {
+    const prev=new Map(),q=[];
+    cells.forEach(c=>{if(c.level!==0||!walk(c.id))return;
+      const e=c.occ.cat==='stair'?entryOf(c):null,outs=c.outer.filter(k=>!e||e.includes(k));
+      if(!outs.length)return; prev.set(c.id,{from:-1,k:outs[0]}); q.push(c.id);});
+    while(q.length){
+      const a=q.shift(),c=cells[a],o=c.occ;
+      const go=(b,how)=>{if(b>=0&&!prev.has(b)&&walk(b)){prev.set(b,Object.assign({from:a},how));q.push(b);}};
+      c.nb.forEach((b,k)=>{if(b>=0&&passAcross(a,k))go(b,{t:'edge',k});});
+      if(o.pair&&o.cat!=='stair')o.pair.forEach(b=>go(b,{t:'same'}));
+      if(o.pair&&o.cat==='stair'&&o.pair[0]===a)go(o.pair[1],{t:'foot'});
+      if(o.group)o.group.ids.forEach(b=>go(b,{t:'same'}));
+      if(o.cat==='stair'&&(o.n!==25||o.pair[1]===a))go(c.up,{t:'up',s:a});
+      if(c.down>=0){const d=cells[c.down],dn=d.occ;if(dn&&dn.cat==='stair'&&(dn.n!==25||dn.pair[1]===d.id))go(d.id,{t:'down'});}
+    }
+    const fy=c=>c.level*S+((c.level===0&&c.occ&&c.occ.cat==='void')?0:.18);
+    const P3=(p,y)=>[p[0],y,p[1]];
+    const mid=(c,k)=>mul(add(c.poly[k],c.poly[(k+1)%c.poly.length]),.5);
+    const center=c=>P3(c.c,fy(c));
+    const stairPts=(st,from)=>{const o=st.occ,y0=st.level*S;
+      if(o.n===24){const w=l=>toWorldR(st,o.rot||0,l);return[P3(w([.15,.81]),y0+.05),P3(w([2.22,.81]),y0+1.5),P3(w([2.62,1.5]),y0+1.5),P3(w([2.22,2.19]),y0+1.5),P3(w([.36,2.19]),y0+3.18)];}
+      if(o.n===25){const A=cells[o.pair[0]],Bc=cells[o.pair[1]],dir=nrm(sub(Bc.c,A.c)),zv=[-dir[1],dir[0]],org=sub(sub(A.c,mul(dir,1.5)),mul(zv,1.5)),w=l=>add(org,add(mul(dir,l[0]),mul(zv,l[1])));
+        return[P3(w([1.04,1.5]),y0+.05),P3(w([4.96,1.5]),y0+3.18)];}
+      if(o.n===26){const hc=st.hexC,pts=[],a0=from?Math.atan2(from[2]-hc[1],from[0]-hc[0]):0;for(let i=0;i<=18;i++){const a=a0+i*20*PI/180;pts.push([hc[0]+.8*Math.cos(a),y0+i*3/18+.05,hc[1]+.8*Math.sin(a)]);}return pts;}
+      const lp=st.shape==='sq'?add(st.fr.p0,add(mul(st.fr.x,.52),mul(st.fr.z,.5))):st.c;
+      return[P3(lp,y0+.05),P3(lp,y0+3.18)];};
+    const build=end=>{const chain=[];for(let x=end;x>=0;x=prev.get(x).from)chain.unshift(x);
+      const f=cells[chain[0]],k0=prev.get(chain[0]).k,pts=[P3(add(mid(f,k0),mul(edgeOut(f.poly,k0),2.6)),0),P3(mid(f,k0),fy(f))];
+      if(f.occ.cat!=='stair')pts.push(center(f));
+      for(let i=1;i<chain.length;i++){const b=cells[chain[i]],h=prev.get(chain[i]),a=cells[h.from];
+        if(h.t==='edge'){pts.push(P3(mid(a,h.k),fy(b)));if(b.occ.cat!=='stair')pts.push(center(b));}
+        else if(h.t==='same'){
+          if(a.hexC&&b.hexC&&pk(a.hexC)===pk(b.hexC)){const hc=a.hexC,a0=Math.atan2(a.c[1]-hc[1],a.c[0]-hc[0]);let d=Math.atan2(b.c[1]-hc[1],b.c[0]-hc[0])-a0;
+            while(d>PI)d-=2*PI;while(d<-PI)d+=2*PI;const n=Math.max(1,Math.ceil(Math.abs(d)/(PI/6)));
+            for(let j=1;j<n;j++){const t=a0+d*j/n;pts.push([hc[0]+1.75*Math.cos(t),fy(b),hc[1]+1.75*Math.sin(t)]);}}
+          pts.push(center(b));}
+        else if(h.t==='foot')pts.push(stairPts(a)[0]);
+        else if(h.t==='up'){const st=cells[h.s],sp=stairPts(st,pts[pts.length-1]);(st.occ.n===25?sp.slice(1):sp).forEach(p=>pts.push(p));pts.push(center(b));}
+        else stairPts(b).slice().reverse().forEach(p=>pts.push(p));
+      }
+      return pts;};
+    caps.forEach(c=>{const o=c.occ;if(!o||o.cat!=='capsule'||!o.door)return;
+      const dr=o.door,d=cells[dr.id],k=dr.k,b=d.nb[k],y0=d.level*S,n=edgeOut(d.poly,k),m=mid(d,k),inside=P3(d.c,y0+.15);
+      let pts=null;
+      if(dr.mode==='ladder') pts=[P3(add(m,mul(n,3.6)),0),P3(add(m,mul(n,1.3)),0),P3(add(m,mul(n,1.3)),y0+.18),P3(add(m,mul(n,.6)),y0+.18),P3(m,y0+.15),inside];
+      else if(b<0&&d.level===0) pts=[P3(add(m,mul(n,2.6)),0),P3(m,.05),inside];
+      else if(b>=0&&prev.has(b)) pts=build(b).concat([P3(m,fy(cells[b])),inside]);
+      if(!pts) return;
+      let len=0;for(let i=1;i<pts.length;i++)len+=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1],pts[i][2]-pts[i-1][2]);
+      routes.push({cap:c.id,n:o.n,level:d.level,pts,len});
+    });
+  }
+
   /* notes */
   notes.push({t:'틀: '+info.text+' · 칸 '+cells.length+'개'});
   const topH=Math.max(...cols.map(c=>c.H));
@@ -713,10 +780,13 @@ function generate(pool,frame,sizeKey,seed,notes,opt){
   if(acc.doors) notes.push({t:'캡슐 출입 규칙: 문 '+acc.doors+'개'+(acc.deck?' · 문 앞 비움을 데크로 보정 '+acc.deck+'곳':'')+(acc.balc?' · 바깥 발코니 '+acc.balc+'곳':''),c:'ok'});
   if(stairFix.rot||stairFix.deck||stairFix.drop) notes.push({t:'계단 입구 규칙: 입구가 디딜 곳을 향하도록 '+stairFix.rot+'곳 회전'+(stairFix.deck?' · 입구 앞 비움을 데크로 '+stairFix.deck+'곳':'')+(stairFix.drop?' · 입구가 막힌 계단 '+stairFix.drop+'곳을 데크로 교체':''),c:stairFix.drop?'warn':'ok'});
   notes.push({t:'연결성 규칙: '+(unreached?'1층과 이어지지 않은 캡슐 '+unreached+'개':'모든 캡슐이 1층에서 걸어서 닿음')+(con.moved?' · 문 위치 변경 '+con.moved:'')+(con.stair?' · 계단 추가 '+con.stair:'')+(con.ladder?' · 바깥 사다리 '+con.ladder:'')+(con.drop?' · 데크로 교체 '+con.drop:''),c:unreached?'warn':'ok'});
+  if(routes.length){const far=routes.reduce((a,b)=>b.len>a.len?b:a);notes.push({t:'동선: 캡슐 '+routes.length+'개까지 가는 길 · 가장 먼 곳은 '+(far.level+1)+'층 '+far.n+' '+byN[far.n].name+' ('+far.len.toFixed(1)+'m)',c:'ok'});}
+  {const noWay=caps.filter(c=>c.occ&&c.occ.cat==='capsule'&&c.occ.door&&doorOK(c.occ.door,reachFinal)&&!routes.some(r=>r.cap===c.id)).length;
+   if(noWay) notes.push({t:'동선 검사: 1층 안쪽에 갇힌 칸으로만 이어져서 밖에서는 걸어 들어갈 수 없는 캡슐 '+noWay+'개',c:'warn'});}
   if(acc.fail) notes.push({t:'사방이 막혀 들어갈 수 없는 캡슐 '+acc.fail+'개를 데크로 교체',c:'warn'});
   if(roof.some(x=>x.n===12)&&!has(28)) notes.push({t:'28 사다리 자동 보충: 지붕 위 캡슐로 올라가는 길',c:'warn'});
   Object.keys(counts).forEach(k=>{if(counts[k]<=0)delete counts[k];});
-  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies,unreached,con,stairFix,braces,topH};
+  return {cells,cols,info,counts,auto,roof,fac,greens,frame,doors,balconies,unreached,con,stairFix,braces,topH,routes};
 }
 
 /* ================= RENDER ================= */
@@ -724,6 +794,8 @@ const M={
   frame:new THREE.MeshStandardMaterial({roughness:.6,metalness:.1}),
   brace:new THREE.MeshStandardMaterial({roughness:.5,metalness:.2}),
   joint:new THREE.MeshStandardMaterial({roughness:.4,metalness:.3}),
+  person:new THREE.MeshStandardMaterial({roughness:.6}),
+  route:new THREE.LineDashedMaterial({dashSize:.35,gapSize:.22,transparent:true,opacity:.9}),
   capsule:new THREE.MeshStandardMaterial({roughness:.45}),
   capLine:new THREE.LineBasicMaterial(),
   deck:new THREE.MeshStandardMaterial({roughness:.85}),
@@ -763,6 +835,12 @@ function exportDAE(){
 function exportDAEInner(){
   const clone=root.clone(true),cache=new Map(),drop=[];
   clone.updateMatrixWorld(true);
+  const insts=[];clone.traverse(o=>{if(o.userData&&o.userData.inst)insts.push(o);});
+  insts.forEach(g=>{const meshes=[],parts={};g.traverse(o=>{if(o.isMesh)meshes.push(o);});
+    meshes.forEach(m=>{const k=PART_NAME[matKey(m.material)]||'기타';
+      if(!parts[k]){parts[k]=new THREE.Group();parts[k].name=k;g.add(parts[k]);parts[k].updateMatrixWorld(true);}
+      parts[k].attach(m);m.name=k;});
+    g.children.slice().forEach(ch=>{if(!Object.values(parts).includes(ch))g.remove(ch);});});
   clone.traverse(o=>{
     if(o.isLine||o.isLineSegments||o.isSprite){drop.push(o);return;}
     if(!o.isMesh) return;
@@ -786,7 +864,7 @@ let grid=null;
 function applyColors(scene){
   const c=n=>new THREE.Color(tok(n)),bg=c('--bg'),ink=c('--ink'),dark=bg.getHSL({}).l<.5;
   scene.background=bg;
-  M.frame.color=ink; M.brace.color=c('--brace'); M.joint.color=c('--joint'); M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
+  M.frame.color=ink; M.brace.color=c('--brace'); M.joint.color=c('--joint'); M.person.color=c('--person'); M.route.color=c('--person'); M.capsule.color=c('--capsule').lerp(bg,dark?.55:.62); M.capLine.color=c('--capsule');
   M.deck.color=c('--deck'); M.deckGlass.color=c('--deck'); M.stair.color=c('--stair');
   ['facade','perf','cloth','glassF'].forEach(k=>M[k].color=c('--facade'));
   M.leaf.color=c('--green'); M.pot.color=c('--muted'); M.soil.color=c('--muted').lerp(ink,.35); M.paving.color=c('--muted').lerp(bg,.5); M.door.color=ink.clone().lerp(c('--capsule'),.35);
@@ -875,7 +953,7 @@ function drawFlat(c,n,y0){
 function renderDoor(d){
   const th=Math.atan2(d.n[0],d.n[1]),side=[d.n[1],-d.n[0]];
   B(root,d.w,d.h,.06,d.p[0],d.y+d.h/2,d.p[1],M.door,0,th);
-  B(root,d.w*.12,.06,.05,d.p[0]+d.n[0]*.05+side[0]*d.w*.32,d.y+d.h*.48,d.p[1]+d.n[1]*.05+side[1]*d.w*.32,M.frame,0,th);
+  B(root,d.w*.12,.06,.05,d.p[0]+d.n[0]*.05+side[0]*d.w*.32,d.y+d.h*.48,d.p[1]+d.n[1]*.05+side[1]*d.w*.32,M.joint,0,th);
   if(d.rungs) for(let i=1;i<=3;i++){const a=add(d.p,add(mul(d.n,.2),mul(side,.25))),b=add(d.p,add(mul(d.n,.2),mul(side,-.25))),y=d.y-1.2+i*.32;bar(root,[a[0],y,a[1]],[b[0],y,b[1]],.03,M.stair);}
   if(d.steps) [[.67,.2],[.33,.5]].forEach(([h,o])=>{const q=add(d.p,mul(d.n,o));B(root,.9,h,.3,q[0],d.base+h/2,q[1],M.stair,0,th);});
 }
@@ -964,37 +1042,79 @@ function renderFacade(f,res){
   else if(f.n===34){const nv=Math.max(2,Math.round(L/.2));for(let i=0;i<=nv;i++){const a=at(L*(.035+.93*i/nv));bar(root,[a[0],y0+.2,a[1]],[a[0],y0+2.8,a[1]],.012,M.facade);}
     for(let j=0;j<=13;j++){const a=at(L*.035),b=at(L*.965);bar(root,[a[0],y0+.2+j*.2,a[1]],[b[0],y0+.2+j*.2,b[1]],.012,M.facade);}}
 }
+/* every module instance becomes its own group — "05_캡슐 단층_2층_#3" — so SketchUp's Outliner lists modules one by one */
+const PART_NAME={capsule:'몸체',door:'문',joint:'부착부',deck:'바닥판',deckGlass:'바닥판',stair:'계단·사다리',frame:'프레임 부재',brace:'가새',facade:'패널',perf:'패널',cloth:'패널',glassF:'패널',leaf:'식재',pot:'화분·줄기',soil:'흙',paving:'포장'};
+const matKey=m=>Object.keys(M).find(k=>M[k]===m)||'misc';
 function renderAll(res,seedStr){
-  const r=makeRng('render|'+seedStr),main=root,bins={};
-  const intoName=name=>{if(!bins[name]){bins[name]=new THREE.Group();bins[name].name=name;main.add(bins[name]);}root=bins[name];};
+  const r=makeRng('render|'+seedStr),main=root,bins={},instCnt={},capG={};
+  let bin=null;
+  const intoName=name=>{if(!bins[name]){bins[name]=new THREE.Group();bins[name].name=name;main.add(bins[name]);}bin=root=bins[name];};
   const into=n=>intoName(String(n).padStart(2,'0')+'_'+byN[n].name);
-  const seen=new Set();
+  const inst=(n,level,at,tag)=>{const key=n+'|'+(tag||'');instCnt[key]=(instCnt[key]||0)+1;
+    const g=new THREE.Group();g.name=String(n).padStart(2,'0')+'_'+byN[n].name+(tag?'_'+tag:'')+'_'+(level+1)+'층_#'+instCnt[key];
+    g.userData.inst={n,level,x:at?+at[0].toFixed(2):0,z:at?+at[1].toFixed(2):0,tag:tag||''};bin.add(g);root=g;return g;};
+  const part=name=>{const g=new THREE.Group();g.name=name;bin.add(g);return g;};
+  /* R1 frame: columns and beams as separate member groups */
   into(res.frame);
+  const gCol=part('기둥'),gBeam=part('보'),seen=new Set();
   res.cells.forEach(c=>{
     const y0=c.level*S,n=c.poly.length;
-    const seg=(a,b)=>{const k=[a,b].map(v=>v.map(x=>Math.round(x*100)).join(',')).sort().join('|');if(seen.has(k))return;seen.add(k);bar(root,a,b,.15);};
+    const seg=(a,b)=>{const k=[a,b].map(v=>v.map(x=>Math.round(x*100)).join(',')).sort().join('|');if(seen.has(k))return;seen.add(k);bar(a[1]===b[1]?gBeam:gCol,a,b,.15);};
     for(let i=0;i<n;i++){const p=c.poly[i],q=c.poly[(i+1)%n];seg([p[0],y0,p[1]],[q[0],y0,q[1]]);seg([p[0],y0+S,p[1]],[q[0],y0+S,q[1]]);seg([p[0],y0,p[1]],[p[0],y0+S,p[1]]);}
   });
-  if(res.braces.length){intoName('R1_브레이싱');res.braces.forEach(b=>renderBrace(res,b));}
-  if(ui.joints){intoName('R1_조인트');const vs=new Set();
+  if(res.braces.length){intoName('R1_브레이싱');const BN={X:'교차가새',D:'외가새',K:'무릎가새'},bc={};
+    res.braces.forEach(b=>{const lv=res.cells[b.id].level;bc[b.type]=(bc[b.type]||0)+1;root=part(BN[b.type]+'_'+(lv+1)+'층_#'+bc[b.type]);renderBrace(res,b);});}
+  if(ui.joints){intoName('R1_조인트');const gN=part('절점 노드'),gP=part('베이스 플레이트'),vs=new Set();
     res.cells.forEach(c=>{const y0=c.level*S;c.poly.forEach(p=>[y0,y0+S].forEach(y=>{const k=pk(p)+'|'+Math.round(y*100);if(vs.has(k))return;vs.add(k);
-      B(root,.27,.27,.27,p[0],y,p[1],M.joint);if(y===0)B(root,.62,.05,.62,p[0],.025,p[1],M.joint);}));});}
-  res.cells.forEach(c=>{if(c.occ&&c.occ.base){into(c.occ.base);drawFlat(c,c.occ.base,c.level*S);}if(c.occ&&c.occ.n)into(c.occ.n);renderBody(c,res,r);});
-  intoName('R2_캡슐 문');res.doors.forEach(renderDoor);
-  if(res.balconies.length){into(14);res.balconies.forEach(bk=>renderBalcony(res,bk));}
-  res.roof.forEach(x=>{into(x.n);const c=res.cells[x.id],y=(c.level+1)*S;
+      B(gN,.27,.27,.27,p[0],y,p[1],M.joint);if(y===0)B(gP,.62,.05,.62,p[0],.025,p[1],M.joint);}));});}
+  res.cells.forEach(c=>{const o=c.occ;if(!o)return;
+    if(o.base){into(o.base);inst(o.base,c.level,c.c,'계단받침');drawFlat(c,o.base,c.level*S);}
+    if(o.n){into(o.n);const g=inst(o.n,c.level,c.c);if(o.cat==='capsule')capG[c.id]=g;}
+    renderBody(c,res,r);});
+  /* doors and balconies belong to their capsule */
+  res.doors.forEach(d=>{root=capG[d.cap]||root;renderDoor(d);});
+  res.balconies.forEach(bk=>{root=capG[bk.cap]||root;renderBalcony(res,bk);});
+  res.roof.forEach(x=>{into(x.n);const c=res.cells[x.id],y=(c.level+1)*S;inst(x.n,c.level+1,c.c);
     if(x.n===12){const g=local(c.fr.p0,y,c.fr.th);capRect(g,2.4,1.8,2.34,1.5,.08,1.5);B(g,3,.08,.3,1.5,.04,.15,M.deck);if(ui.joints)[[.3,.33],[2.7,.33],[.3,2.67],[2.7,2.67]].forEach(p=>B(g,.24,.1,.24,p[0],.09,p[1],M.joint));
-      intoName('R2_캡슐 문');const gd=local(c.fr.p0,y,c.fr.th);B(gd,.8,1.45,.06,1.5,.18+.725,.3,M.door);
-      into(28);const gl=local(c.fr.p0,c.level*S,c.fr.th);ladder(gl,.3,.12);}
+      const gd=local(c.fr.p0,y,c.fr.th);B(gd,.8,1.45,.06,1.5,.18+.725,.3,M.door);
+      into(28);inst(28,c.level,c.c,'지붕캡슐용');const gl=local(c.fr.p0,c.level*S,c.fr.th);ladder(gl,.3,.12);}
     else{polySlab(root,c.poly,y,.18,M.deck);polySlab(root,shrink(c.poly,.97),y+.18,.1,M.pot);polySlab(root,shrink(c.poly,.97),y+.28,.16,M.soil);polySlab(root,shrink(c.poly,.97),y+.44,.03,M.leaf);}
   });
-  res.fac.forEach(f=>{into(f.n);renderFacade(f,res);});
+  res.fac.forEach(f=>{into(f.n);const c=res.cells[f.id];inst(f.n,c.level,mul(add(c.poly[f.k],c.poly[(f.k+1)%c.poly.length]),.5));renderFacade(f,res);});
   res.greens.forEach(x=>{into(x.n);
-    if(x.n===35){const c=res.cells[x.id],a=add(c.c,mul(sub(c.poly[0],c.c),.35));plant(root,a[0],c.level*S+.18,a[1]);}
-    else if(x.n===36){const p=x.at||res.cells[x.id].c;tree(root,p[0],p[1],r);}
+    const c=x.id!==undefined?res.cells[x.id]:null;inst(x.n,c?c.level:0,x.at||x.p||(c&&c.c));
+    if(x.n===35){const a=add(c.c,mul(sub(c.poly[0],c.c),.35));plant(root,a[0],c.level*S+.18,a[1]);}
+    else if(x.n===36){const p=x.at||c.c;tree(root,p[0],p[1],r);}
     else if(x.n===37){bar(root,[x.p[0],0,x.p[1]],[x.p[0],x.h,x.p[1]],.006,M.pot);const cnt=Math.round(x.h*6);for(let i=0;i<cnt;i++){const a=r()*PI*2,rr=.15+r()*.15;shrub(root,x.p[0]+Math.cos(a)*rr,.2+r()*(x.h-.2),x.p[1]+Math.sin(a)*rr,.07+r()*.09);}}
   });
   root=main;
+  /* drop empty instance groups (second cell of a pair, plain voids) */
+  const hasMesh=g=>{let f=false;g.traverse(o=>{if(o.isMesh)f=true;});return f;};
+  main.children.slice().forEach(b=>{b.children.slice().forEach(g=>{if(g.isGroup&&!hasMesh(g))b.remove(g);});if(!hasMesh(b))main.remove(b);});
+}
+
+/* parts list (BOM) — one row per module instance, plus frame member totals; opens in Excel */
+function exportCSV(){
+  if(!root) return;
+  root.updateMatrixWorld(true);
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"',f=v=>v.toFixed(2),rows=[];
+  rows.push(['구분','원소 번호','원소 이름','족','층','X (m)','Z (m)','가로 (m)','깊이 (m)','높이 (m)','구성요소','SketchUp 그룹 이름'].map(q).join(','));
+  root.traverse(g=>{const u=g.userData&&g.userData.inst;if(!u)return;
+    const bx=new THREE.Box3().setFromObject(g),sz=bx.getSize(new THREE.Vector3()),parts={};
+    g.traverse(o=>{if(o.isMesh){const k=PART_NAME[matKey(o.material)]||'기타';parts[k]=(parts[k]||0)+1;}});
+    const fam=FAMS.find(x=>x.id===byN[u.n].f).name;
+    rows.push(['모듈',u.n,byN[u.n].name+(u.tag?' ('+u.tag+')':''),fam,u.level+1,f(u.x),f(u.z),f(sz.x),f(sz.z),f(sz.y),Object.entries(parts).map(([k,v])=>k+' '+v).join(' / '),g.name].map(q).join(','));
+  });
+  rows.push('');
+  rows.push(['구분','부재','개수','총 길이 (m)'].map(q).join(','));
+  const members={};
+  root.traverse(o=>{if(!o.isMesh)return;const k=matKey(o.material);if(k!=='frame'&&k!=='brace')return;
+    const par=o.parent&&o.parent.name||'';const name=k==='brace'?par.split('_')[0]:(par==='기둥'||par==='보'?par:null);if(!name)return;
+    (members[name]=members[name]||{n:0,L:0});members[name].n++;members[name].L+=o.scale.y-(k==='brace'?.085:.15);});
+  Object.entries(members).forEach(([k,v])=>rows.push(['부재',k,v.n,f(v.L)].map(q).join(',')));
+  const url=URL.createObjectURL(new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='pavilion_'+lastSeed.replace(/[^0-9a-z]/gi,'-')+'_부재목록.csv';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 
 /* ================= THREE SETUP ================= */
@@ -1008,6 +1128,61 @@ const ground=new THREE.Mesh(new THREE.PlaneGeometry(400,400),M.ground);ground.ro
 const cam=new THREE.PerspectiveCamera(36,1,.1,600);
 const ctl=new THREE.OrbitControls(cam,cv);ctl.enableDamping=true;ctl.maxPolarAngle=PI*.495;
 let lastBox=null;
+
+/* ================= PEOPLE ================= */
+const peopleG=new THREE.Group();scene.add(peopleG);
+let walkers=[],peopleClock=0,oneIdx=0;
+function makePerson(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(.17,.21,.75,12),M.person);body.position.y=1.12;g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.14,14,10),M.person);head.position.y=1.66;g.add(head);
+  g.userData.legs=[-.09,.09].map(x=>{const pv=new THREE.Group();pv.position.set(x,.76,0);const l=new THREE.Mesh(new THREE.BoxGeometry(.1,.76,.11),M.person);l.position.y=-.38;pv.add(l);g.add(pv);return pv;});
+  g.traverse(o=>{if(o.isMesh){o.castShadow=true;}});return g;
+}
+function routeTimes(pts){const t=[0];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],h=Math.hypot(b[0]-a[0],b[2]-a[2]),v=Math.abs(b[1]-a[1]);t.push(t[i-1]+Math.max(.08,h/1.3+v/(h<.3?.45:.9)));}return t;}
+function clearPeople(){peopleG.traverse(o=>{if(o.geometry)o.geometry.dispose();});peopleG.clear();walkers=[];}
+function buildPeople(res){
+  clearPeople();
+  const note=$('peopleNote');
+  if(ui.people==='off'||!res.routes.length){if(note&&!res.routes.length)note.textContent='이번 배치에는 걸어서 갈 캡슐이 없어요.';return;}
+  const list=ui.people==='one'?[res.routes[oneIdx%res.routes.length]]:res.routes;
+  list.forEach((rt,i)=>{
+    const v=rt.pts.map(p=>new THREE.Vector3(p[0],p[1]+.04,p[2]));
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(v),M.route);line.computeLineDistances();peopleG.add(line);
+    const dots=[];for(let j=1;j<v.length;j++){const L=v[j].distanceTo(v[j-1]),n=Math.max(1,Math.round(L/.45));for(let q=0;q<n;q++)dots.push(v[j-1].clone().lerp(v[j],q/n));}
+    const im=new THREE.InstancedMesh(new THREE.SphereGeometry(ui.people==='one'?.09:.065,8,6),M.person,dots.length),mx=new THREE.Matrix4();
+    dots.forEach((d,j)=>{mx.makeTranslation(d.x,d.y+.03,d.z);im.setMatrixAt(j,mx);});peopleG.add(im);
+    const g=makePerson();peopleG.add(g);
+    const t=routeTimes(rt.pts);
+    walkers.push({rt,g,t,T:t[t.length-1],delay:ui.people==='all'?i*1.4:0,yaw:0});
+  });
+  peopleClock=0;
+  if(note){const rt=list[0];note.textContent=ui.people==='one'
+    ?'지금 '+(oneIdx%res.routes.length+1)+'/'+res.routes.length+'번째: '+(rt.level+1)+'층 '+rt.n+' '+byN[rt.n].name+'까지 '+rt.len.toFixed(1)+'m. 다 들어가면 다음 캡슐로 넘어가요.'
+    :'거주자 '+res.routes.length+'명이 차례로 출발해 각자 캡슐로 들어가요.';}
+}
+let lastRes=null;
+function updatePeople(dt){
+  if(!walkers.length) return;
+  peopleClock+=dt;
+  const PAUSE=1.2;
+  for(const w of walkers){
+    const lt=peopleClock-w.delay;
+    if(lt<0){w.g.visible=false;continue;}
+    const cyc=w.T+PAUSE,tt=ui.people==='one'?lt:lt%cyc;
+    if(ui.people==='one'&&lt>cyc&&lastRes&&lastRes.routes.length>1){oneIdx++;buildPeople(lastRes);return;}
+    if(tt>=w.T){w.g.visible=false;continue;}
+    w.g.visible=true;
+    let i=1;while(i<w.t.length-1&&w.t[i]<tt)i++;
+    const a=w.rt.pts[i-1],b=w.rt.pts[i],u=(tt-w.t[i-1])/Math.max(1e-6,w.t[i]-w.t[i-1]);
+    w.g.position.set(a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,a[2]+(b[2]-a[2])*u);
+    const dx=b[0]-a[0],dz=b[2]-a[2],h=Math.hypot(dx,dz),climb=Math.abs(b[1]-a[1])>h*1.5;
+    if(h>.05&&!climb) w.yaw=Math.atan2(dx,dz);
+    w.g.rotation.y=w.yaw;
+    const sw=climb?.25*Math.sin(lt*6):.55*Math.sin(lt*8);
+    w.g.userData.legs[0].rotation.x=sw;w.g.userData.legs[1].rotation.x=-sw;
+  }
+}
 function fitView(){
   if(!lastBox) return;
   const c=lastBox.getCenter(new THREE.Vector3()),s=lastBox.getSize(new THREE.Vector3());
@@ -1018,15 +1193,17 @@ function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;R.se
 new ResizeObserver(resize).observe(vp);
 document.getElementById('resetview').addEventListener('click',fitView);
 document.getElementById('exportdae').addEventListener('click',exportDAE);
+document.getElementById('exportcsv').addEventListener('click',exportCSV);
 
 /* ================= UI ================= */
-const ui={mode:'discover',draw:9,size:'S',floors:0,brace:'graded',joints:true,struct:false,pick:new Set(EL.filter(e=>e.first).map(e=>e.n))};
+const ui={mode:'discover',draw:9,size:'S',people:'one',floors:0,brace:'graded',joints:true,struct:false,pick:new Set(EL.filter(e=>e.first).map(e=>e.n))};
 const $=id=>document.getElementById(id);
 const seedEl=$('seed');
 function setPressed(container,val){container.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===String(val)?'true':'false'));}
 
 $('drawSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.draw=+b.dataset.v;setPressed($('drawSeg'),ui.draw);ui.size=SIZE_BY_DRAW[ui.draw];setPressed($('sizeSeg'),ui.size);});
 $('sizeSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.size=b.dataset.v;setPressed($('sizeSeg'),ui.size);run();});
+$('peopleSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.people=b.dataset.v;setPressed($('peopleSeg'),ui.people);oneIdx=0;if(lastRes)buildPeople(lastRes);});
 $('floorSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.floors=+b.dataset.v;setPressed($('floorSeg'),ui.floors);run();});
 $('braceSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.brace=b.dataset.v;setPressed($('braceSeg'),ui.brace);run();});
 $('jointSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ui.joints=b.dataset.v==='on';setPressed($('jointSeg'),b.dataset.v);run();});
@@ -1090,6 +1267,7 @@ function run(){
   const res=generate(pool,frame,ui.size,seedEl.value,notes,{floors:ui.floors,brace:ui.brace});
   res.counts[frame]=1; if(autoFrame) res.auto.add(frame);
   renderAll(res,seedEl.value);lastSeed=seedEl.value;applyStruct();
+  lastRes=res;oneIdx=0;buildPeople(res);
   lastBox=new THREE.Box3().setFromObject(root);
   const sz=lastBox.getSize(new THREE.Vector3()),c=lastBox.getCenter(new THREE.Vector3()),span=Math.max(sz.x,sz.z,sz.y);
   sun.target.position.copy(c);sun.position.copy(c).add(new THREE.Vector3(span*.8,span*1.6,span*1.1));
@@ -1120,7 +1298,8 @@ new MutationObserver(themeChanged).observe(document.documentElement,{attributes:
 applyColors(scene);resize();
 seedEl.value='group2/1';
 run();
-(function loop(){requestAnimationFrame(loop);ctl.update();R.render(scene,cam);})();
+let lastT=performance.now();
+(function loop(now){requestAnimationFrame(loop);const dt=Math.min(.1,((now||performance.now())-lastT)/1000);lastT=now||performance.now();updatePeople(dt);ctl.update();R.render(scene,cam);})();
 })();
 </script>
 
